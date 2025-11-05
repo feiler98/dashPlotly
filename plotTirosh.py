@@ -1,29 +1,65 @@
 # dependencies
 from dash import Dash, html, dash_table, callback, Output, Input, dcc
 import pandas as pd
+import numpy as np
 from pathlib import Path
 import plotly.express as px
 
-
 # import data
+# ----------------------------------------------------------------------------------------------------------------------
 path_tirosh_dir = Path("/home/feilerwe/bench_data/dataloader/other/marker_genes__tirosh_group")
 dict_tirosh_data = {p.stem: pd.read_csv(p) for p in path_tirosh_dir.glob("*.csv")}
 dict_keys = {tag.replace("_", " "): tag for tag in dict_tirosh_data.keys()}
+# ----------------------------------------------------------------------------------------------------------------------
 
 app = Dash()
 app.layout = [
-    html.Img(src="/static/assets/weizmann_institute.png", alt="Weizmann Institute Banner", style={"width":"20vw", "min-width":"250px"}),
-    html.Hr(),
-    dcc.Dropdown(options=list(dict_keys.keys()), value=list(dict_keys.keys())[0], id="radio_tirosh_table"),
-    html.Hr(),
-    dash_table.DataTable(columns=[], data=[], id="input_tirosh_table", page_size=(), filter_action="native"),
-    # records is essential so that the app runs
-    dcc.Dropdown(options=["10 rows", "20 rows", "50 rows", "100 rows"], value="10 rows", id="radio_tirosh_len_table", style={"width": "120px", "height":"35px"}),
-    html.Button(children="reset filter", id="clear_filter", n_clicks=0, style={"width": "120px", "height":"35px", "margin-top":"5px", "border-color":"#ad1a38", "border-width":"thin", "border-radius":"5px", "background":"#e64e6d"}),
-    html.Hr(),
-    dcc.Graph(figure={}, id="input_tirosh_figure", style={"width": "97vw", "height": "65vh", "min-height": "300px"}),
-    html.Hr()
+    html.Div(className="background_div"),
+    html.Div(className="main_div smooth_transition", id="main_div",
+        children=[
+            html.Div(id="nav_bar", className="smooth_transition", children=[
+                html.Img(draggable="false", src="/static/assets/weizmann_institute.png",
+                         alt="Weizmann Institute Banner",
+                         style={"width": "300px", "min-width": "250px", "margin-left": "0px", "filter": "invert(1)"}),
+                dcc.Dropdown(options=["slim", "full screen"], value="slim" ,id="radio_pageWidth_settings", style={"width": "120px", "height":"35px"})
+            ]),
+            html.Div(id="behind_nav_bar_spacer"),
+            html.Hr(),
+            dcc.Dropdown(options=list(dict_keys.keys()), value=list(dict_keys.keys())[0], id="radio_tirosh_table"),
+            html.Hr(),
+            dash_table.DataTable(columns=[], data=[], id="input_tirosh_table", page_size=10, filter_action="native"),
+            # records is essential so that the app runs
+            html.Div(children=[
+            dcc.Dropdown(options=["10 rows", "20 rows", "50 rows", "100 rows"], value="10 rows", id="radio_tirosh_len_table", style={"width": "120px", "height":"35px"}),
+            html.Button(children="reset filter", id="clear_filter", n_clicks=0,
+                        style={"width": "120px", "height":"36px", "margin-left":"5px", "border-color":"#ad1a38", "border-width":"thin", "border-radius":"5px", "background":"#e64e6d"})],
+            style={"display":"flex", "margin-bottom":"30px", "justify-content":"right", "margin-top":"10px"}),
+            html.Hr(),
+            dcc.Dropdown(options=["balanced accuracy", "sensitivity", "specificity", "combined"], value="balanced accuracy",
+                         id="radio_tirosh_figure"),
+            dcc.Graph(figure={}, id="input_tirosh_figure", className="smooth_transition", style={"width": "1100px", "height": "600px"}),  # change one to change all (width)
+            html.Hr()
+        ])
 ]
+
+# control page width settings
+# -------------------------------------------------------------------------------------------------------------
+@callback(
+    Output(component_id="main_div", component_property="style"),
+    Output(component_id="nav_bar", component_property="style"),
+    Output(component_id="input_tirosh_figure", component_property="style"),
+    Output(component_id="radio_pageWidth_settings", component_property="value"),
+    Input(component_id="radio_pageWidth_settings", component_property="value")
+)
+def update_page(setting_page):
+    width_main = "1200px"
+    width_fig = "1100px"
+    if setting_page == "full screen":
+        width_main= "100vw"
+        width_fig = "95vw"
+    return {"width": width_main}, {"width": width_main}, {"width": width_fig}, setting_page
+
+# -------------------------------------------------------------------------------------------------------------
 
 
 # controls to build interactive table
@@ -63,16 +99,22 @@ def reset_filter(n_clicks):
 # -------------------------------------------------------------------------------------------------------------
 @callback(
     Output(component_id="input_tirosh_figure", component_property="figure"),
-    Input(component_id="radio_tirosh_table", component_property="value")
+    Input(component_id="radio_tirosh_table", component_property="value"),
+    Input(component_id="radio_tirosh_figure", component_property="value")
 )
-def update_figure(chosen_table: str):
+def update_figure(chosen_table: str, chosen_size_param: str):
     key = dict_keys[chosen_table]
     df_selected = dict_tirosh_data[key].copy()
     df_selected["balanced accuracy"] = [round((sens + spec) / 2, 4) for sens, spec in
                                         zip(list(df_selected["sensitivity"]), list(df_selected["specificity"]))]
     first_col = list(df_selected.columns)[0]
+    if chosen_size_param == "combined":
+        chosen_size_param = "combined_non_negative"
+
+        df_selected["combined_non_negative"] = np.maximum([x for x in list(df_selected["combined"])], 0).tolist()
+
     fig = px.scatter(df_selected, y="specificity", x="sensitivity", color=first_col,
-                     size="balanced accuracy", hover_data=["gene"])
+                     size=chosen_size_param, hover_data=["gene"])
     return fig
 # -------------------------------------------------------------------------------------------------------------
 

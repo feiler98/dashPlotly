@@ -1,0 +1,89 @@
+:root {
+    --backgroundSize: 400px;
+    --navBarHeight: 100px;
+}
+
+body {
+  margin: 0px 0px;
+  padding: 0px 0px;
+  display: flex;
+  position: absolute;
+  justify-content: center;
+  align-items: top;
+  width: 100vw;
+  height: auto;
+  background-color: #000000;
+  background-size: cover;
+  background-position: center;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  user-select: none;
+  scrollbar-width: none;
+}
+
+#react-entry-point {
+    justify-content: center;
+    align-items: top;
+    width: 100vw;
+    height: auto;
+    display: flex;
+}
+
+.background_div {
+  opacity: 0.8;
+  margin: 0px 0px;
+  padding: 0px 0px;
+  display: grid;
+  position: fixed;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  background-color: transparent;
+  justify-content: center;
+  transition: filter 1.7s ease;
+  background-image: url('dna.png');
+  background-size: var(--backgroundSize);
+  animation: movingBackground 16s linear infinite;
+}
+
+@keyframes movingBackground {
+    0% {background-position: 0 0;}
+    100% {background-position: var(--backgroundSize) var(--backgroundSize);}
+}
+
+.main_div {
+    position: absolute;
+    background: #fff;
+    width: 1200px;
+    height: auto;
+    display: grid;
+    align-items: left;
+    justify-content: center;
+    overflow: hidden;
+}
+
+#nav_bar {
+    z-index: 100;
+    height: var(--navBarHeight);
+    width: 1200px;
+    background: #2183b0;
+    position: fixed;
+    justify-content: space-around;
+    align-items: center;
+    display: flex;
+}
+
+#behind_nav_bar_spacer {
+    height: var(--navBarHeight);
+    width: auto;
+    background: transparent;
+    position: relative;
+}
+
+.smooth_transition {
+    transition: width 0.7s ease;
+}
+
+hr {
+    width: 100%;
+}
