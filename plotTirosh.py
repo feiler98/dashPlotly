@@ -27,6 +27,7 @@ app.layout = [
             html.Hr(),
             dcc.Dropdown(options=list(dict_keys.keys()), value=list(dict_keys.keys())[0], id="radio_tirosh_table"),
             html.Hr(),
+            html.Div(style={"height":"50px"}),
             dash_table.DataTable(columns=[], data=[], id="input_tirosh_table", page_size=10, filter_action="native"),
             # records is essential so that the app runs
             html.Div(children=[
@@ -114,7 +115,7 @@ def update_figure(chosen_table: str, chosen_size_param: str):
         df_selected["combined_non_negative"] = np.maximum([x for x in list(df_selected["combined"])], 0).tolist()
 
     fig = px.scatter(df_selected, y="specificity", x="sensitivity", color=first_col,
-                     size=chosen_size_param, hover_data=["gene"])
+                     size=chosen_size_param, hover_data=["combined", "gene"])
     return fig
 # -------------------------------------------------------------------------------------------------------------
 
