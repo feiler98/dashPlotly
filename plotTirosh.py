@@ -30,9 +30,9 @@ app.layout = [
             dash_table.DataTable(columns=[], data=[], id="input_tirosh_table", page_size=10, filter_action="native"),
             # records is essential so that the app runs
             html.Div(children=[
-            dcc.Dropdown(options=["10 rows", "20 rows", "50 rows", "100 rows"], value="10 rows", id="radio_tirosh_len_table", style={"width": "120px", "height":"35px"}),
-            html.Button(children="reset filter", id="clear_filter", n_clicks=0,
-                        style={"width": "120px", "height":"36px", "margin-left":"5px", "border-color":"#ad1a38", "border-width":"thin", "border-radius":"5px", "background":"#e64e6d"})],
+                dcc.Dropdown(options=["10 rows", "20 rows", "50 rows", "100 rows"], value="10 rows", id="radio_tirosh_len_table", style={"width": "120px", "height":"35px"}),
+                html.Button(children="reset filter", id="clear_filter", n_clicks=0,
+                            style={"width": "120px", "height":"36px", "margin-left":"10px", "border-color":"#ad1a38", "border-width":"thin", "border-radius":"5px", "background":"#e64e6d"})],
             style={"display":"flex", "margin-bottom":"30px", "justify-content":"right", "margin-top":"10px"}),
             html.Hr(),
             dcc.Dropdown(options=["balanced accuracy", "sensitivity", "specificity", "combined"], value="balanced accuracy",
