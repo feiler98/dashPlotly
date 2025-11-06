@@ -51,6 +51,11 @@ body {
     100% {background-position: var(--backgroundSize) var(--backgroundSize);}
 }
 
+#cover_full_screen {
+    width: 100vw;
+    height: 100vh;
+}
+
 .main_div {
     position: absolute;
     background: #fff;
@@ -62,7 +67,7 @@ body {
     overflow: hidden;
 }
 
-#nav_bar {
+.nav_bar {
     z-index: 100;
     height: var(--navBarHeight);
     width: 1200px;

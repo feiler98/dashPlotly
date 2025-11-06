@@ -15,9 +15,11 @@ dict_keys = {tag.replace("_", " "): tag for tag in dict_tirosh_data.keys()}
 app = Dash()
 app.layout = [
     html.Div(className="background_div"),
+    html.Div(id="cover_full_screen", className="main_div", style={},
+             children=[html.Div(className="nav_bar", style={"width":"100vw"})]),
     html.Div(className="main_div smooth_transition", id="main_div",
         children=[
-            html.Div(id="nav_bar", className="smooth_transition", children=[
+            html.Div(id="nav_bar", className="nav_bar smooth_transition", children=[
                 html.Img(draggable="false", src="/static/assets/weizmann_institute.png",
                          alt="Weizmann Institute Banner",
                          style={"width": "300px", "min-width": "250px", "margin-left": "0px", "filter": "invert(1)"}),
@@ -47,6 +49,7 @@ app.layout = [
 # -------------------------------------------------------------------------------------------------------------
 @callback(
     Output(component_id="main_div", component_property="style"),
+    Output(component_id="cover_full_screen", component_property="style"),
     Output(component_id="nav_bar", component_property="style"),
     Output(component_id="input_tirosh_figure", component_property="style"),
     Output(component_id="radio_pageWidth_settings", component_property="value"),
@@ -55,10 +58,12 @@ app.layout = [
 def update_page(setting_page):
     width_main = "1200px"
     width_fig = "1100px"
+    dict_cover_bg = {"opacity":"0", "transition":"none"}
     if setting_page == "full screen":
+        dict_cover_bg = {"opacity": "1", "transition": "opacity 0s 0.7s"}
         width_main= "100vw"
         width_fig = "95vw"
-    return {"width": width_main}, {"width": width_main}, {"width": width_fig}, setting_page
+    return {"width": width_main}, dict_cover_bg, {"width": width_main}, {"width": width_fig}, setting_page
 
 # -------------------------------------------------------------------------------------------------------------
 
