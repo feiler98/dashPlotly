@@ -60,7 +60,7 @@ def calc_absolute_bin_position(df_chr_bins: pd.DataFrame, assembly_genome: str =
     df_len_bins["index"] = range(0, len(df_len_bins))
     # filter chr bins
     list_chr_available = list(set(df_chr_bins.loc[:, "CHR"]))
-    list_chr_allowed = list(set(df_len_bins.index))
+    list_chr_allowed = list(df_len_bins.index)
     tuple_match = [c for c in list_chr_allowed if c in list_chr_available]
     df_chr_bins = df_chr_bins.reset_index()
     df_chr_bins = df_chr_bins[df_chr_bins.loc[:, "CHR"].isin(tuple_match)]  # throw out all chromosomes which do not fit!
