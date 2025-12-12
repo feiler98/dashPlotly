@@ -61,6 +61,7 @@ body {
     background: #fff;
     width: 1200px;
     height: auto;
+    min-height: 100vh;
     display: grid;
     align-items: left;
     justify-content: center;
