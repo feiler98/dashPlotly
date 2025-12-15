@@ -236,10 +236,10 @@ def build_cnv_plot(path_json: (str, Path), header: str = None):
     header: str
     """
 
+# docker testing
 if __name__ == "__main__":
-    path_ck_csv = Path("/home/feilerwe/Docker_project/working_docker_out/new_copykat output/out__GBM__hg_38__RCM__ntc10ngc5ws25ks0.1__copykat/GBM__hg_38__RCM__ntc10ngc5ws25ks0.1__copykat__GBC.csv")
     # fix CHR columns with lambda
-    df_cnv = pd.read_csv(path_ck_csv)
-    df_cnv["CHR"] = df_cnv["CHR"].map(lambda x: f"chr{x}")
-    df_cnv.to_csv(path_ck_csv.parent / "copykat_curated.csv")
-    gen_cnv_abs_data(path_ck_csv.parent / "copykat_curated.csv")
+    # df_cnv = pd.read_csv(path_ck_csv)
+    # df_cnv["CHR"] = df_cnv["CHR"].map(lambda x: f"chr{x}")
+    path_ck_cnv = Path(__file__).parent.parent / "data" / "test_cnv_plot" / "copykat_curated.csv"
+    gen_cnv_abs_data(path_ck_cnv)
