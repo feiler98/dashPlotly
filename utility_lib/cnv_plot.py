@@ -4,6 +4,7 @@ import matplotlib as mpl
 import plotly.graph_objects as go
 from pathlib import Path
 from pyomics import utils as ut
+from itertools import islice
 import pandas as pd
 import multiprocessing as mp
 import os
@@ -166,9 +167,13 @@ def gen_cnv_abs_data(path_cnv_csv: (str, Path), assembly_genome: str = "hg_38") 
         dict_cell_tiles.update(sub_dicts)
     # update json dict
     cnv_plot_json_dict.update({"cells": dict_cell_tiles})
+    cnv_plot_json_dict.update({"cell_tags": list_cells})
+    map_cell_pos_yaxis = [x+0.5 for x in range(0, len(list_cells), 1)]
+    cnv_plot_json_dict.update({"cells_y_pos": map_cell_pos_yaxis})
 
     ut.save_as_json_dict(cnv_plot_json_dict, parent_path, f"{path_cnv_csv.stem}__dash_cnv_matrix")
     return cnv_plot_json_dict
+
 
 def process_df_row(df_row: pd.Series, list_cells: list) -> dict:
     dict_append = {}
@@ -228,13 +233,56 @@ def add_heatmap_tile(go_figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple
                                        showlegend=showlegend))
 
 
-def build_cnv_plot(path_json: (str, Path), header: str = None):
+# multiprocessing function for add_heatmap_tile
+def mult_run_tile_generator(json_dict_slice, go_figure_obj):
+    for values in json_dict_slice.value():
+        add_heatmap_tile(go_figure_obj, **values)
+
+
+def dict_to_chunks(data_dict, chunk_size=10000):
+    it = iter(data_dict)
+    for i in range(0, len(data_dict), chunk_size):
+        yield {k:data_dict[k] for k in islice(it, chunk_size)}
+
+
+def build_cnv_plot(path_json: (str, Path), header: (str, None) = None):
     """
     Parameters
     ----------
     path_json: str | Path
-    header: str
+    header: str | None
     """
+    path_json = Path(path_json)
+    path_out = path_json.parent
+
+    # import HSON file
+    json_dict = ut.get_json_dict(path_json)
+
+    # figure construction
+    # -------------------
+    if header is None:
+        header = path_json.stem.split("__")[0]
+    fig = go.Figure(go.Layout(title=go.Layout.Title(text=f"CNV prediction | {header}")))
+    fig.update_layout(xaxis_title="cell entities",
+                      yaxis_title="unified chromosomal position",
+                      yaxis= dict(
+                          tickmode = "array",
+                          tickvals = json_dict["cells_y_pos"],
+                          ticktext = json_dict["cell_tags"]
+                      ))
+    # chromosomes
+    for sub_dict_val in json_dict["chr"].values():
+        add_heatmap_tile(fig, showlegend=False, **sub_dict_val)
+
+    # heatmap tiles
+    gen_chunk_cells = dict_to_chunks(json_dict["cells"])
+    list_data_packages = [(slice_cells, fig) for slice_cells in gen_chunk_cells]
+    with mp.Pool(os.cpu_count()) as pool:
+        pool.starmap(mult_run_tile_generator, list_data_packages)
+    # export as html for easy and fast access
+    fig.write_html(path_out / f"{header}.html")  # we have a sorting issue with the algorithm
+
+
 
 # docker testing
 if __name__ == "__main__":
@@ -243,3 +291,4 @@ if __name__ == "__main__":
     # df_cnv["CHR"] = df_cnv["CHR"].map(lambda x: f"chr{x}")
     path_ck_cnv = Path(__file__).parent.parent / "data" / "test_cnv_plot" / "copykat_curated.csv"
     gen_cnv_abs_data(path_ck_cnv)
+    build_cnv_plot(path_ck_cnv.parent / "copykat_curated__dash_cnv_matrix.json")
