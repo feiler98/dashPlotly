@@ -237,7 +237,7 @@ def add_heatmap_tile(go_figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple
 
 # multiprocessing function for add_heatmap_tile
 def mult_run_tile_generator(json_dict_slice, go_figure_obj):
-    for values in json_dict_slice.value():
+    for values in json_dict_slice.values():
         add_heatmap_tile(go_figure_obj, **values)
 
 
