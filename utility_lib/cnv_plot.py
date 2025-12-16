@@ -263,9 +263,10 @@ def build_cnv_plot(path_json: (str, Path), header: (str, None) = None):
     # -------------------
     if header is None:
         header = path_json.stem.split("__")[0]
-    fig = go.Figure(go.Layout(title=go.Layout.Title(text=f"CNV prediction | {header}")))
-    fig.update_layout(xaxis_title="cell entities",
-                      yaxis_title="unified chromosomal position",
+    fig = go.Figure()
+    fig.update_layout(title=f"CNV prediction | {header}",
+                      yaxis_title="cell entities",
+                      xaxis_title="unified chromosomal position",
                       yaxis= dict(
                           tickmode = "array",
                           tickvals = json_dict["cells_y_pos"],
@@ -276,12 +277,10 @@ def build_cnv_plot(path_json: (str, Path), header: (str, None) = None):
         add_heatmap_tile(fig, showlegend=False, **sub_dict_val)
 
     # heatmap tiles
-    """
     gen_chunk_cells = dict_to_chunks(json_dict["cells"])
     list_data_packages = [(slice_cells, fig) for slice_cells in gen_chunk_cells]
     with mp.Pool(os.cpu_count()) as pool:
         pool.starmap(mult_run_tile_generator, list_data_packages)
-    """
     # export as html for easy and fast access
     fig.write_html(path_out / f"{header}.html")  # we have a sorting issue with the algorithm
 
@@ -293,6 +292,6 @@ if __name__ == "__main__":
     # df_cnv = pd.read_csv(path_ck_csv)
     # df_cnv["CHR"] = df_cnv["CHR"].map(lambda x: f"chr{x}")
     path_ck_cnv = Path(__file__).parent.parent / "data" / "test_cnv_plot" / "copykat_curated.csv"
-    gen_cnv_abs_data(path_ck_cnv)
-    build_cnv_plot(path_ck_cnv.parent / "copykat_curated__dash_cnv_matrix.json")
+    #gen_cnv_abs_data(path_ck_cnv)
+    #build_cnv_plot(path_ck_cnv.parent / "copykat_curated__dash_cnv_matrix.json")
     build_cnv_plot(path_ck_cnv.parent / "copykat_curated__dash_cnv_matrix.json")
