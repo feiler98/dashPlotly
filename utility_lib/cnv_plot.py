@@ -94,6 +94,7 @@ def gen_cnv_abs_data(path_cnv_csv: (str, Path), assembly_genome: str = "hg_38") 
         min_val = -min_val
     # normalized dataframe --> 0 is centered!
     df_norm = slice_data.map(lambda x: (x - min_val) / (max_val - min_val))
+    df_norm.drop("Unnamed: 0", axis=1)
     # absolute position of genomic bins
     slice_pos, tuple_match = calc_absolute_bin_position(df_cnv[slice_data_list], assembly_genome)
     df_norm_abs_cnv = pd.concat([slice_pos, df_norm], axis=1)
@@ -275,10 +276,12 @@ def build_cnv_plot(path_json: (str, Path), header: (str, None) = None):
         add_heatmap_tile(fig, showlegend=False, **sub_dict_val)
 
     # heatmap tiles
+    """
     gen_chunk_cells = dict_to_chunks(json_dict["cells"])
     list_data_packages = [(slice_cells, fig) for slice_cells in gen_chunk_cells]
     with mp.Pool(os.cpu_count()) as pool:
         pool.starmap(mult_run_tile_generator, list_data_packages)
+    """
     # export as html for easy and fast access
     fig.write_html(path_out / f"{header}.html")  # we have a sorting issue with the algorithm
 
@@ -291,4 +294,5 @@ if __name__ == "__main__":
     # df_cnv["CHR"] = df_cnv["CHR"].map(lambda x: f"chr{x}")
     path_ck_cnv = Path(__file__).parent.parent / "data" / "test_cnv_plot" / "copykat_curated.csv"
     gen_cnv_abs_data(path_ck_cnv)
+    build_cnv_plot(path_ck_cnv.parent / "copykat_curated__dash_cnv_matrix.json")
     build_cnv_plot(path_ck_cnv.parent / "copykat_curated__dash_cnv_matrix.json")
