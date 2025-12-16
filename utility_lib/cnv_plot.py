@@ -294,6 +294,5 @@ if __name__ == "__main__":
     # df_cnv = pd.read_csv(path_ck_csv)
     # df_cnv["CHR"] = df_cnv["CHR"].map(lambda x: f"chr{x}")
     path_ck_cnv = Path(__file__).parent.parent / "data" / "test_cnv_plot" / "copykat_curated.csv"
-    #gen_cnv_abs_data(path_ck_cnv)
-    #build_cnv_plot(path_ck_cnv.parent / "copykat_curated__dash_cnv_matrix.json")
+    gen_cnv_abs_data(path_ck_cnv)
     build_cnv_plot(path_ck_cnv.parent / "copykat_curated__dash_cnv_matrix.json")
