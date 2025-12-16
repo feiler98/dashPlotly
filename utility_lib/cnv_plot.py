@@ -231,6 +231,7 @@ def add_heatmap_tile(go_figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple
                                        marker=None,
                                        mode='lines',
                                        name=info_str,
+                                       hoverinfo="text",
                                        showlegend=showlegend))
 
 
@@ -276,11 +277,12 @@ def build_cnv_plot(path_json: (str, Path), header: (str, None) = None):
     for sub_dict_val in json_dict["chr"].values():
         add_heatmap_tile(fig, showlegend=False, **sub_dict_val)
 
-    # heatmap tiles
+        # heatmap tiles
     gen_chunk_cells = dict_to_chunks(json_dict["cells"])
     list_data_packages = [(slice_cells, fig) for slice_cells in gen_chunk_cells]
     with mp.Pool(os.cpu_count()) as pool:
         pool.starmap(mult_run_tile_generator, list_data_packages)
+
     # export as html for easy and fast access
     fig.write_html(path_out / f"{header}.html")  # we have a sorting issue with the algorithm
 
