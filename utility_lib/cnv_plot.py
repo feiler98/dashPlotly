@@ -2,11 +2,13 @@
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import plotly.graph_objects as go
+import plotly.figure_factory as ff
 from pathlib import Path
 from pyomics import utils as ut
 import pandas as pd
 import multiprocessing as mp
 import os
+import numpy as np
 
 
 general_data_path = Path(__file__).parent.parent / "data" / "genome"
@@ -196,9 +198,105 @@ def process_df_row(df_row: pd.Series, list_cells: list) -> dict:
     return dict_append
 
 
+# color gradient
+# ----------------------------------------------------------------------------------------------------------------------
+
+def c_w_c_grad_calc(rgb_min: tuple, rgb_max: tuple, norm_value: (int | float)) -> tuple:
+    """
+    Parameters
+    ----------
+    rgb_min: tuple
+        (int(r), int(g), int(b))  r,g,b --> 0-255
+    rgb_max: tuple
+        (int(r), int(g), int(b))  r,g,b --> 0-255
+    norm_value: int | float
+        Value normalized to range 0-1.
+
+    Returns
+    -------
+    tuple
+        (int(r), int(g), int(b))  r,g,b --> 0-255
+    """
+
+    # check if norm_value is normalized
+    if not 0 <= norm_value <= 1:
+        raise ValueError(f"Variable 'norm_value' must be an element of [0, 1], received {norm_value}")
+
+    rgb_fff = (255, 255, 255)
+    if norm_value < 0.5:
+        tuple_diff = np.subtract(rgb_fff, rgb_min)
+        norm_value = (0.5 - norm_value)/0.5
+        rgb_out = tuple(int(f - float(v)*norm_value) for f, v in zip(rgb_fff, tuple_diff))
+    elif norm_value == 0.5:
+        rgb_out = rgb_fff
+    else:
+        tuple_diff = np.subtract(rgb_fff, rgb_max)
+        norm_value = (norm_value-0.5)/0.5
+        rgb_out = tuple(int(f - float(v)*norm_value) for f, v in zip(rgb_fff, tuple_diff))
+    return rgb_out
+
+
+
 # plotting
 # ----------------------------------------------------------------------------------------------------------------------
 
+def list_transpose(l: list) -> list:
+    return list(map(list, zip(*l)))
+
+# correct one to use
+def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"):
+    """
+    Creates a plotly heatmap of infercnv data
+
+    Parameters
+    ----------
+    path_cnv_csv: str | Path
+    assembly_genome: str
+    """
+
+    # setting up the plotting dependencies
+    # ------------------------------------
+    # plot colors:
+    rgb_max = (242, 88, 252)  # #f258fc  --> magenta
+    rgb_min = (48, 59, 217)  # 303bd9  --> blue
+    parent_path = Path(path_cnv_csv).parent
+    path_genome_data = Path(__file__).parent.parent / "data" / "genome"
+    list_available_genome = [p.stem.split("__")[0] for p in path_genome_data.glob("*.gtf")]
+
+    df_cnv = pd.read_csv(path_cnv_csv)
+    slice_data_list = ["CHR", "START", "END"]
+    col_data = [c for c in df_cnv.columns if c not in slice_data_list]
+    # true values of CNV method
+    slice_data = df_cnv[col_data]
+
+    # min-max normalization of the data
+    max_val = abs(slice_data.max().max())
+    min_val = abs(slice_data.min().min())
+    # centering 0
+    if max_val > min_val:
+        min_val = -max_val
+    else:
+        max_val = min_val
+        min_val = -min_val
+    # normalized dataframe --> 0-1 min-max
+    df_norm = slice_data.map(lambda x: (x - min_val) / (max_val - min_val))
+    len_x, len_y = df_norm.shape
+
+    # position of bins
+    bin_df = df_cnv[slice_data_list]
+
+    ##############
+    # HOVER TEXT #
+    ##############
+    list_genomic_pos_hm_tile = [[f"{row["CHR"]} | {row["START"]} - {row["END"]}"]*len_x for _, row in bin_df.iterrows()]
+
+
+
+
+
+
+# DEPRECATED
+# ----------------------------------------------------------------------------------------------------------------------
 # functions for constructing the plot
 def bwr_color(value: int) -> tuple:
     """
@@ -212,6 +310,8 @@ def bwr_color(value: int) -> tuple:
 
     Returns
     -------
+    tuple
+        (r,g,b)
 
     """
     value = int(value * 255)  # must be int, otherwise value will be red
@@ -233,6 +333,7 @@ def add_heatmap_tile(go_figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple
                                        showlegend=showlegend))
 
 
+# too laggy to use
 def build_cnv_plot(path_json: (str, Path), header: (str, None) = None):
     """
     Parameters
@@ -269,7 +370,7 @@ def build_cnv_plot(path_json: (str, Path), header: (str, None) = None):
 
     # export as html for easy and fast access
     fig.write_html(path_out / f"{header}.html")  # we have a sorting issue with the algorithm
-
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 # docker testing
