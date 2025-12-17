@@ -4,7 +4,6 @@ import matplotlib as mpl
 import plotly.graph_objects as go
 from pathlib import Path
 from pyomics import utils as ut
-from itertools import islice
 import pandas as pd
 import multiprocessing as mp
 import os
@@ -53,8 +52,8 @@ def mult_get_bin_info(slice_df: pd.DataFrame, tuple_bins: tuple, df_len_bins: pd
 
 def calc_absolute_bin_position(df_chr_bins: pd.DataFrame, assembly_genome: str = "hg_38"):
     # get genes & positions
-    df_gene_loc = get_gene_loc(assembly_genome)
 
+    df_gene_loc = get_gene_loc(assembly_genome)
     # import df with chrom bins
     path_genomic_bins = Path(general_data_path / f"{assembly_genome}__chr_bin_lengths__ucsc.csv")
     df_len_bins = pd.read_csv(path_genomic_bins).set_index("CHR")
@@ -94,7 +93,6 @@ def gen_cnv_abs_data(path_cnv_csv: (str, Path), assembly_genome: str = "hg_38") 
         min_val = -min_val
     # normalized dataframe --> 0 is centered!
     df_norm = slice_data.map(lambda x: (x - min_val) / (max_val - min_val))
-    df_norm.drop("Unnamed: 0", axis=1)
     # absolute position of genomic bins
     slice_pos, tuple_match = calc_absolute_bin_position(df_cnv[slice_data_list], assembly_genome)
     df_norm_abs_cnv = pd.concat([slice_pos, df_norm], axis=1)
@@ -235,18 +233,6 @@ def add_heatmap_tile(go_figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple
                                        showlegend=showlegend))
 
 
-# multiprocessing function for add_heatmap_tile
-def mult_run_tile_generator(json_dict_slice, go_figure_obj):
-    for values in json_dict_slice.values():
-        add_heatmap_tile(go_figure_obj, **values)
-
-
-def dict_to_chunks(data_dict, chunk_size=10000):
-    it = iter(data_dict)
-    for i in range(0, len(data_dict), chunk_size):
-        yield {k:data_dict[k] for k in islice(it, chunk_size)}
-
-
 def build_cnv_plot(path_json: (str, Path), header: (str, None) = None):
     """
     Parameters
@@ -277,11 +263,9 @@ def build_cnv_plot(path_json: (str, Path), header: (str, None) = None):
     for sub_dict_val in json_dict["chr"].values():
         add_heatmap_tile(fig, showlegend=False, **sub_dict_val)
 
-        # heatmap tiles
-    gen_chunk_cells = dict_to_chunks(json_dict["cells"])
-    list_data_packages = [(slice_cells, fig) for slice_cells in gen_chunk_cells]
-    with mp.Pool(os.cpu_count()) as pool:
-        pool.starmap(mult_run_tile_generator, list_data_packages)
+    # heatmap tiles
+    for sub_dict_val in json_dict["cells"].values():
+        add_heatmap_tile(fig, showlegend=False, **sub_dict_val)
 
     # export as html for easy and fast access
     fig.write_html(path_out / f"{header}.html")  # we have a sorting issue with the algorithm
@@ -293,6 +277,9 @@ if __name__ == "__main__":
     # fix CHR columns with lambda
     # df_cnv = pd.read_csv(path_ck_csv)
     # df_cnv["CHR"] = df_cnv["CHR"].map(lambda x: f"chr{x}")
-    path_ck_cnv = Path(__file__).parent.parent / "data" / "test_cnv_plot" / "copykat_curated.csv"
-    gen_cnv_abs_data(path_ck_cnv)
-    build_cnv_plot(path_ck_cnv.parent / "copykat_curated__dash_cnv_matrix.json")
+    path_ck_cnv = Path(__file__).parent.parent / "data" / "test_cnv_plot"
+    csv_alter = pd.read_csv(path_ck_cnv / "copykat_curated.csv")
+    csv_alter = csv_alter[["CHR", "START", "END", "scONE_GBM_549", "scONE_GBM_550", "scONE_GBM_557"]]
+    csv_alter.set_index("CHR").to_csv(path_ck_cnv / "copykat_curated_slim.csv")
+    gen_cnv_abs_data(path_ck_cnv / "copykat_curated_slim.csv")
+    build_cnv_plot("/home/feilerwe/dashPlotly/data/test_cnv_plot/copykat_curated_slim__dash_cnv_matrix.json")
