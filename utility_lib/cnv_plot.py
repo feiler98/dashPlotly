@@ -359,17 +359,17 @@ def bwr_color(value: int) -> tuple:
     return rgb_tuple
 
 
-def add_heatmap_tile(go_figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple, info_str: str, showlegend=False):
-    go_figure_obj.add_trace(go.Scatter(x=coordinates_xy[0],  # top-right, bottom-right, bottom-left, top-left
-                                       y=coordinates_xy[1],
-                                       fill='toself',
-                                       fillcolor=f"rgb{tuple(rgb)}",
-                                       line={"width":0},
-                                       marker=None,
-                                       mode='lines',
-                                       name=info_str,
-                                       hoverinfo="text",
-                                       showlegend=showlegend))
+def add_heatmap_tile(figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple, info_str: str, showlegend=False):
+    figure_obj.add_trace(go.Scatter(x=coordinates_xy[0],  # top-right, bottom-right, bottom-left, top-left
+                                    y=coordinates_xy[1],
+                                    fill='toself',
+                                    fillcolor=f"rgb{tuple(rgb)}",
+                                    line={"width":0},
+                                    marker=None,
+                                    mode='lines',
+                                    name=info_str,
+                                    hoverinfo="text",
+                                    showlegend=showlegend))
 
 
 # too laggy to use
