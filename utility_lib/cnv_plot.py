@@ -1,8 +1,9 @@
 # import
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import plotly
 import plotly.graph_objects as go
-import plotly.figure_factory as ff
+import plotly.express as px
 from pathlib import Path
 from pyomics import utils as ut
 import pandas as pd
@@ -26,6 +27,13 @@ def convert_ucsc_cytoband(path: (str | Path)) -> pd.DataFrame:
         slice_df.drop_duplicates(subset="tag_arm", keep="first", inplace=True)
         list_concat.append(slice_df)
     return pd.concat(list_concat).astype({"START":int, "END": int}).set_index("CHR").drop(["tag", "tag_alter", "END"], axis=1)
+
+
+def map_arm_by_chr_pos(bin_df: pd.DataFrame, assembly_genome: str = "hg_38"):
+    df_arms = pd.read_csv(general_data_path / f"{assembly_genome}__loc_qp_arm.csv", index_col="CHR")
+    list_genomic_arm_tag = [[f"chr-arm | {"p" if df_arms.where(df_arms["tag_arms"] == "q").dropna().loc[row["CHR"], "START"] > row["START"] else "q"}"] for _, row in
+                              bin_df.iterrows()]
+    return list_genomic_arm_tag
 
 
 def get_gene_loc(assembly_genome: str = "hg_38") -> pd.DataFrame:
@@ -256,7 +264,7 @@ def list_transpose(l: list) -> list:
     return list(map(list, zip(*l)))
 
 # correct one to use
-def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"):
+def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38", zero_one_norm: bool = False):
     """
     Creates a plotly heatmap of infercnv data
 
@@ -264,16 +272,17 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
     ----------
     path_cnv_csv: str | Path
     assembly_genome: str
+    zero_one_norm: bool
     """
 
     # setting up the plotting dependencies
     # ------------------------------------
     # plot colors:
-    rgb_max = (242, 88, 252)  # #f258fc  --> magenta
-    rgb_min = (48, 59, 217)  # 303bd9  --> blue
     parent_path = Path(path_cnv_csv).parent
     path_genome_data = Path(__file__).parent.parent / "data" / "genome"
     list_available_genome = [p.stem.split("__")[0] for p in path_genome_data.glob("*.gtf")]
+    if assembly_genome not in list_available_genome:
+        raise ValueError(f"Given genome {assembly_genome} is not available! Currently available {list_available_genome}.")
 
     df_cnv = pd.read_csv(path_cnv_csv)
     slice_data_list = ["CHR", "START", "END"]
@@ -290,8 +299,11 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
     else:
         max_val = min_val
         min_val = -min_val
+
+    if not zero_one_norm:
+        min_val = 0
     # normalized dataframe --> 0-1 min-max
-    df_norm = slice_data.map(lambda x: (x - min_val) / (max_val - min_val))
+    df_norm = slice_data.map(lambda x: round((x - min_val) / (max_val - min_val), 2))
     len_x, len_y = df_norm.shape
 
     # position of bins
@@ -300,12 +312,27 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
     ##############
     # HOVER TEXT #
     ##############
-    list_genomic_pos_hm_tile = [[f"{row["CHR"]} | {row["START"]} - {row["END"]}"]*len_x for _, row in bin_df.iterrows()]
+    list_genomic_pos_hm_tile = [f"{row["CHR"]} | {row["START"]} - {row["END"]}" for _, row in bin_df.iterrows()]
 
+    df_gene_loc = get_gene_loc(assembly_genome)
+    #list_genomic_pos_genes = [get_gene_string(df_gene_loc, row["CHR"], row["START"], row["END"]) for _, row in bin_df.iterrows()]
 
+    #list_genomic_arm_tag = map_arm_by_chr_pos(bin_df, assembly_genome)
 
+    labels_dict = dict(
+        y="cells",
+        x="genomic_bins",
+        color="normalized CNA-value"
+    )
 
-
+    fig = px.imshow(df_norm.T.to_numpy(),
+                    y=list(df_norm.columns),
+                    x=list_genomic_pos_hm_tile,
+                    labels = labels_dict,
+                    text_auto=False,
+                    aspect="auto",
+                    color_continuous_scale=["#303bd9", "#ffffff", "#f258fc"])
+    plotly.offline.plot(fig, filename='test.html')
 
 # DEPRECATED
 # ----------------------------------------------------------------------------------------------------------------------
@@ -391,8 +418,4 @@ if __name__ == "__main__":
     # df_cnv = pd.read_csv(path_ck_csv)
     # df_cnv["CHR"] = df_cnv["CHR"].map(lambda x: f"chr{x}")
     path_ck_cnv = Path(__file__).parent.parent / "data" / "test_cnv_plot"
-    csv_alter = pd.read_csv(path_ck_cnv / "copykat_curated.csv")
-    csv_alter = csv_alter[["CHR", "START", "END", "scONE_GBM_549", "scONE_GBM_550", "scONE_GBM_557"]]
-    csv_alter.set_index("CHR").to_csv(path_ck_cnv / "copykat_curated_slim.csv")
-    gen_cnv_abs_data(path_ck_cnv / "copykat_curated_slim.csv")
-    build_cnv_plot("/home/feilerwe/dashPlotly/data/test_cnv_plot/copykat_curated_slim__dash_cnv_matrix.json")
+    build_cnv_heatmap(path_ck_cnv / "copykat_curated.csv")
