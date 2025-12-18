@@ -16,6 +16,18 @@ general_data_path = Path(__file__).parent.parent / "data" / "genome"
 # data preparation
 # ----------------------------------------------------------------------------------------------------------------------
 
+def convert_ucsc_cytoband(path: (str | Path)) -> pd.DataFrame:
+    df_cytoband = pd.read_csv(Path(path), sep="\t", names=["CHR", "START", "END", "tag", "tag_alter"]).dropna(how="any", axis=0)
+    set_chr = list(df_cytoband["CHR"].unique())
+    list_concat = []
+    for chr_tag in set_chr:
+        slice_df = df_cytoband.where(df_cytoband["CHR"] == chr_tag).dropna().sort_values(by="START", ascending=True)
+        slice_df["tag_arm"] = [list(t)[0] for t in list(slice_df["tag"])]
+        slice_df.drop_duplicates(subset="tag_arm", keep="first", inplace=True)
+        list_concat.append(slice_df)
+    return pd.concat(list_concat).astype({"START":int, "END": int}).set_index("CHR").drop(["tag", "tag_alter", "END"], axis=1)
+
+
 def get_gene_loc(assembly_genome: str = "hg_38") -> pd.DataFrame:
     df_genes = pd.read_csv(general_data_path / f"{assembly_genome}__refGene.gtf", sep="\t",
                            names=["CHR", "refGene", "type", "START", "END", '.', '+', '..1', "gene"]).drop(
