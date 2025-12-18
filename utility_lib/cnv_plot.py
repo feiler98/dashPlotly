@@ -256,12 +256,48 @@ def c_w_c_grad_calc(rgb_min: tuple, rgb_max: tuple, norm_value: (int | float)) -
     return rgb_out
 
 
+def bwr_color(value: int) -> tuple:
+    """
+    Parameters
+    ----------
+    value: int
+        Expects a 0-1 normalized value.
+        x <= 0 results in a blue color.
+        0.5 results in white.
+        x >= 1 results in red
+
+    Returns
+    -------
+    tuple
+        (r,g,b)
+
+    """
+    value = int(value * 255)  # must be int, otherwise value will be red
+    cmap = mpl.colormaps.get_cmap('bwr')
+    rgb_tuple = tuple(map(lambda x: int(x * 255), cmap(value)))[:3]  # split off the alpha
+    return rgb_tuple
+
+
 
 # plotting
 # ----------------------------------------------------------------------------------------------------------------------
 
+def add_heatmap_tile(figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple, info_str: str, showlegend=False):
+    figure_obj.add_trace(go.Scatter(x=coordinates_xy[0],  # top-right, bottom-right, bottom-left, top-left
+                                    y=coordinates_xy[1],
+                                    fill='toself',
+                                    fillcolor=f"rgb{tuple(rgb)}",
+                                    line={"width":0},
+                                    marker=None,
+                                    mode='lines',
+                                    name=info_str,
+                                    hoverinfo="text",
+                                    showlegend=showlegend))
+
+
 def list_transpose(l: list) -> list:
     return list(map(list, zip(*l)))
+
 
 # correct one to use
 def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38", zero_one_norm: bool = False):
@@ -331,46 +367,13 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
                     labels = labels_dict,
                     text_auto=False,
                     aspect="auto",
+                    title=path_cnv_csv.stem,
                     color_continuous_scale=["#303bd9", "#ffffff", "#f258fc"])
-    plotly.offline.plot(fig, filename='test.html')
+    plotly.offline.plot(fig, filename=parent_path / f"{path_cnv_csv.stem}.html")
+
 
 # DEPRECATED
 # ----------------------------------------------------------------------------------------------------------------------
-# functions for constructing the plot
-def bwr_color(value: int) -> tuple:
-    """
-    Parameters
-    ----------
-    value: int
-        Expects a 0-1 normalized value.
-        x <= 0 results in a blue color.
-        0.5 results in white.
-        x >= 1 results in red
-
-    Returns
-    -------
-    tuple
-        (r,g,b)
-
-    """
-    value = int(value * 255)  # must be int, otherwise value will be red
-    cmap = mpl.colormaps.get_cmap('bwr')
-    rgb_tuple = tuple(map(lambda x: int(x * 255), cmap(value)))[:3]  # split off the alpha
-    return rgb_tuple
-
-
-def add_heatmap_tile(figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple, info_str: str, showlegend=False):
-    figure_obj.add_trace(go.Scatter(x=coordinates_xy[0],  # top-right, bottom-right, bottom-left, top-left
-                                    y=coordinates_xy[1],
-                                    fill='toself',
-                                    fillcolor=f"rgb{tuple(rgb)}",
-                                    line={"width":0},
-                                    marker=None,
-                                    mode='lines',
-                                    name=info_str,
-                                    hoverinfo="text",
-                                    showlegend=showlegend))
-
 
 # too laggy to use
 def build_cnv_plot(path_json: (str, Path), header: (str, None) = None):
