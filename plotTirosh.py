@@ -40,7 +40,7 @@ app.layout = [
             html.Hr(),
             dcc.Dropdown(options=["balanced accuracy", "sensitivity", "specificity", "combined"], value="balanced accuracy",
                          id="radio_tirosh_figure"),
-            dcc.Graph(figure={}, id="input_tirosh_figure", className="smooth_transition", style={"width": "1100px", "height": "1000px"}),  # change one to change all (width)
+            dcc.Graph(figure={}, id="input_tirosh_figure", className="smooth_transition", style={"width": "1100px", "height": "700px"}),  # change one to change all (width)
             html.Hr()
         ])
 ]
