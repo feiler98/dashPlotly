@@ -1,5 +1,5 @@
 # import
-import matplotlib.pyplot as plt
+# ----------------------------------------------------------------------------------------------------------------------
 import matplotlib as mpl
 import plotly
 import plotly.graph_objects as go
@@ -10,8 +10,13 @@ import pandas as pd
 import multiprocessing as mp
 import os
 import numpy as np
+# ----------------------------------------------------------------------------------------------------------------------
 
+# helpful resources
+# x-axis connected figures in dash plotly --> https://stackoverflow.com/questions/75871154/plotly-share-x-axis-for-subset-of-subplots
+# periodic table of elements --> https://plotly.com/python/annotated-heatmap/
 
+# data genomic data
 general_data_path = Path(__file__).parent.parent / "data" / "genome"
 
 # data preparation
@@ -29,9 +34,8 @@ def convert_ucsc_cytoband(path: (str | Path)) -> pd.DataFrame:
     return pd.concat(list_concat).astype({"START":int, "END": int}).set_index("CHR").drop(["tag", "tag_alter", "END"], axis=1)
 
 
-def map_arm_by_chr_pos(bin_df: pd.DataFrame, assembly_genome: str = "hg_38"):
-    df_arms = pd.read_csv(general_data_path / f"{assembly_genome}__loc_qp_arm.csv", index_col="CHR")
-    list_genomic_arm_tag = [[f"chr-arm | {"p" if df_arms.where(df_arms["tag_arms"] == "q").dropna().loc[row["CHR"], "START"] > row["START"] else "q"}"] for _, row in
+def map_arm_by_chr_pos(bin_df: pd.DataFrame, df_arms: pd.DataFrame):
+    list_genomic_arm_tag = [f"chr-arm | {"p" if df_arms.where(df_arms["tag_arm"] == "q").dropna().loc[row["CHR"], "START"] > row["START"] else "q"}" for _, row in
                               bin_df.iterrows()]
     return list_genomic_arm_tag
 
@@ -320,7 +324,12 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
     if assembly_genome not in list_available_genome:
         raise ValueError(f"Given genome {assembly_genome} is not available! Currently available {list_available_genome}.")
 
+    # import and filter
     df_cnv = pd.read_csv(path_cnv_csv)
+    df_arms = pd.read_csv(general_data_path / f"{assembly_genome}__loc_qp_arm.csv", index_col="CHR")
+    allowed_chr_list = list(set(df_arms.index))
+    df_cnv = df_cnv.where(df_cnv["CHR"].isin(allowed_chr_list)).dropna()
+
     slice_data_list = ["CHR", "START", "END"]
     col_data = [c for c in df_cnv.columns if c not in slice_data_list]
     # true values of CNV method
@@ -353,7 +362,11 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
     df_gene_loc = get_gene_loc(assembly_genome)
     #list_genomic_pos_genes = [get_gene_string(df_gene_loc, row["CHR"], row["START"], row["END"]) for _, row in bin_df.iterrows()]
 
-    #list_genomic_arm_tag = map_arm_by_chr_pos(bin_df, assembly_genome)
+    list_genomic_arm_tag = map_arm_by_chr_pos(bin_df, df_arms)
+
+    list_text = [[item]*len(col_data) for item in list_genomic_arm_tag]
+    list_text_t = np.array(list_transpose(list_text))
+    print(list_text_t.shape)
 
     labels_dict = dict(
         y="cells",
@@ -367,9 +380,11 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
                     labels = labels_dict,
                     text_auto=False,
                     aspect="auto",
-                    title=path_cnv_csv.stem,
+                    title=f"InferCNA plot | {path_cnv_csv.stem}",
                     color_continuous_scale=["#303bd9", "#ffffff", "#f258fc"])
-    plotly.offline.plot(fig, filename=parent_path / f"{path_cnv_csv.stem}.html")
+    fig.update_layout(title_font_size=24)
+    fig.update(data=[{"customdata": list_text_t, "hovertemplate":"data: %{customdata}"}])
+    plotly.offline.plot(fig, filename=str(parent_path / f"{path_cnv_csv.stem}.html"))
 
 
 # DEPRECATED
