@@ -1,11 +1,13 @@
 # import
 # ----------------------------------------------------------------------------------------------------------------------
-import matplotlib as mpl
 import plotly
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.figure_factory as ff
 from pathlib import Path
 from pyomics import utils as ut
+from collections import Counter
 import pandas as pd
 import multiprocessing as mp
 import os
@@ -13,14 +15,19 @@ import numpy as np
 # ----------------------------------------------------------------------------------------------------------------------
 
 # helpful resources
+# -----------------
 # x-axis connected figures in dash plotly --> https://stackoverflow.com/questions/75871154/plotly-share-x-axis-for-subset-of-subplots
 # periodic table of elements --> https://plotly.com/python/annotated-heatmap/
 
 # data genomic data
 general_data_path = Path(__file__).parent.parent / "data" / "genome"
 
+
 # data preparation
 # ----------------------------------------------------------------------------------------------------------------------
+def list_transpose(l: list) -> list:
+    return list(map(list, zip(*l)))
+
 
 def convert_ucsc_cytoband(path: (str | Path)) -> pd.DataFrame:
     df_cytoband = pd.read_csv(Path(path), sep="\t", names=["CHR", "START", "END", "tag", "tag_alter"]).dropna(how="any", axis=0)
@@ -65,14 +72,10 @@ def df_chunk_splitter(df: pd.DataFrame, chunk_amount: int) -> list:
     return [df.iloc[i:i + chunk_size] for i in range(0, len(df), chunk_size)]
 
 
-def mult_get_bin_info(slice_df: pd.DataFrame, tuple_bins: tuple, df_len_bins: pd.DataFrame, df_gene_loc: pd.DataFrame):
+def mult_get_bin_info(slice_df: pd.DataFrame, df_gene_loc: pd.DataFrame):
     info_genes_per_bin_list = [get_gene_string(df_gene_loc, row["CHR"], row["START"], row["END"]) for _, row in
                                slice_df.iterrows()]
     slice_df["genes_txt"] = info_genes_per_bin_list
-    start_abs_list = [sum(tuple_bins[:df_len_bins.loc[row["CHR"], "index"]]) + row["START"] for _, row in
-                      slice_df.iterrows()]
-    slice_df["STARTabs"] = start_abs_list
-    slice_df["ENDabs"] = slice_df["STARTabs"] + slice_df["diff"]
     return slice_df
 
 
@@ -90,202 +93,17 @@ def calc_absolute_bin_position(df_chr_bins: pd.DataFrame, assembly_genome: str =
     tuple_match = [c for c in list_chr_allowed if c in list_chr_available]
     df_chr_bins = df_chr_bins.reset_index()
     df_chr_bins = df_chr_bins[df_chr_bins.loc[:, "CHR"].isin(tuple_match)]  # throw out all chromosomes which do not fit!
-    df_chr_bins["diff"] = df_chr_bins.loc[:, "END"] - df_chr_bins.loc[:, "START"]
 
-    tuple_bins = tuple(df_len_bins["bin_size"])
     with mp.Pool(os.cpu_count()) as pool:
         df_slices_list = pool.starmap(mult_get_bin_info,
-                                      [(df_chunk, tuple_bins, df_len_bins, df_gene_loc) for df_chunk in
+                                      [(df_chunk, df_gene_loc) for df_chunk in
                                        df_chunk_splitter(df_chr_bins, os.cpu_count() * 2)])
-    df_concat = pd.concat(df_slices_list, axis=0).sort_values("STARTabs", ascending=True)
-    return df_concat.set_index("index"), tuple_match # better safe than sorry for matching the correct index
-
-
-def gen_cnv_abs_data(path_cnv_csv: (str, Path), assembly_genome: str = "hg_38") -> dict:
-    parent_path = Path(path_cnv_csv).parent
-    df_cnv = pd.read_csv(path_cnv_csv)
-    slice_data_list = ["CHR", "START", "END"]
-    col_data = [c for c in df_cnv.columns if c not in slice_data_list]
-    slice_data = df_cnv[col_data]
-
-    # min-max normalization of the data
-    max_val = abs(slice_data.max().max())
-    min_val = abs(slice_data.min().min())
-    # centering 0
-    if max_val > min_val:
-        min_val = -max_val
-    else:
-        max_val = min_val
-        min_val = -min_val
-    # normalized dataframe --> 0 is centered!
-    df_norm = slice_data.map(lambda x: (x - min_val) / (max_val - min_val))
-    # absolute position of genomic bins
-    slice_pos, tuple_match = calc_absolute_bin_position(df_cnv[slice_data_list], assembly_genome)
-    df_norm_abs_cnv = pd.concat([slice_pos, df_norm], axis=1)
-
-    # transform to a dictionary
-    # --> JSON as export format / input for the graph generation
-
-    # construction of file
-    cnv_plot_json_dict = {}
-    """
-    JSON structure
-    ##############
-    
-    main keys:
-    - chr  --> dictionary with chromosome box coordinates + color + info text
-    - cells  --> dictionary with heatmap tiles of chromosome based on df_norm_abs_cnv
-    
-    chr  --> subkeys
-    ----------------
-    coordinates_xy --> ([top-r, bot-r, bot-l, top-l], [top-r, bot-r, bot-l, top-l])
-    rgb --> (r, g, b)
-    info_str --> chr-tag
-    
-    
-    cells  --> subkeys
-    ------------------
-    coordinates_xy --> ([top-r, bot-r, bot-l, top-l], [top-r, bot-r, bot-l, top-l])
-    rgb --> (r, g, b)
-    info_str --> cell_name
-                 chrX:start-stop
-                 Signal
-                 Genes:
-                    gene_1
-                    ...
-                    gene_n
-    """
-
-    # generating the chromosomal-bins
-    # -------------------------------
-    path_genomic_bins = Path(general_data_path / f"{assembly_genome}__chr_bin_lengths__ucsc.csv")
-    df_len_bins = pd.read_csv(path_genomic_bins).set_index("CHR")
-    df_len_bins = df_len_bins.loc[tuple_match,:]
-    tuple_bins = tuple(df_len_bins["bin_size"])
-    chr_collect_dict = {}
-    for i, len_chr in enumerate(tuple_bins):
-        abs_start_pos = sum(tuple_bins[:i])
-        abs_end_pos = sum(tuple_bins[:(i + 1)])
-        top = len(df_norm.columns)+0.5
-        bottom = 0
-        # alternating colors for chromosomal bins
-        if i % 2 == 0:
-            rgb_tuple = (212, 212, 212)
-        else:
-            rgb_tuple = (114, 117, 138)
-        tag_chr = tuple_match[i]
-        dict_chr = {tag_chr: {"coordinates_xy":([abs_end_pos, abs_end_pos, abs_start_pos, abs_start_pos], [top, bottom, bottom, top]),
-                              "rgb":rgb_tuple,
-                              "info_str":f"Chromosome {tag_chr.replace("chr", "")}<br>Total length: {len_chr}"}}
-        chr_collect_dict.update(dict_chr)
-    # update json dict
-    cnv_plot_json_dict.update({"chr": chr_collect_dict})
-
-    # generating the heatmap tiles
-    # ----------------------------
-    list_cells = list(df_norm.columns)
-    mult_rows_list = [row for _, row in df_norm_abs_cnv.iterrows()]
-    with mp.Pool(os.cpu_count()) as pool:
-        list_of_dicts = pool.starmap(process_df_row, [(row, list_cells) for row in mult_rows_list])
-    dict_cell_tiles = {}
-    for sub_dicts in list_of_dicts:
-        dict_cell_tiles.update(sub_dicts)
-    # update json dict
-    cnv_plot_json_dict.update({"cells": dict_cell_tiles})
-    cnv_plot_json_dict.update({"cell_tags": list_cells})
-    map_cell_pos_yaxis = [x+0.5 for x in range(0, len(list_cells), 1)]
-    cnv_plot_json_dict.update({"cells_y_pos": map_cell_pos_yaxis})
-
-    ut.save_as_json_dict(cnv_plot_json_dict, parent_path, f"{path_cnv_csv.stem}__dash_cnv_matrix")
-    return cnv_plot_json_dict
-
-
-def process_df_row(df_row: pd.Series, list_cells: list) -> dict:
-    dict_append = {}
-    abs_start_pos = df_row["STARTabs"]
-    abs_end_pos =  df_row["ENDabs"]
-
-    for y_pos, cell_id in enumerate(list_cells):
-        norm_val = df_row[cell_id]
-        export_tag = f"{cell_id}:{abs_start_pos}-{abs_end_pos}"
-        top = y_pos+1
-        bottom = y_pos
-        if df_row["genes_txt"] is not None:
-            genes_text = "   " + str(df_row["genes_txt"])
-        else:
-            genes_text = "   no gene information available"
-        dict_cell = {export_tag: {"coordinates_xy": ([abs_end_pos, abs_end_pos, abs_start_pos, abs_start_pos],
-                                                    [top, bottom, bottom, top]),
-                                 "rgb": bwr_color(norm_val),
-                                 "info_str": f"Cell {cell_id}<br>{df_row["CHR"]}: {df_row["START"]}-{df_row["END"]}<br>Genes:<br>{genes_text}"}}
-        dict_append.update(dict_cell)
-    return dict_append
-
-
-# color gradient
-# ----------------------------------------------------------------------------------------------------------------------
-
-def c_w_c_grad_calc(rgb_min: tuple, rgb_max: tuple, norm_value: (int | float)) -> tuple:
-    """
-    Parameters
-    ----------
-    rgb_min: tuple
-        (int(r), int(g), int(b))  r,g,b --> 0-255
-    rgb_max: tuple
-        (int(r), int(g), int(b))  r,g,b --> 0-255
-    norm_value: int | float
-        Value normalized to range 0-1.
-
-    Returns
-    -------
-    tuple
-        (int(r), int(g), int(b))  r,g,b --> 0-255
-    """
-
-    # check if norm_value is normalized
-    if not 0 <= norm_value <= 1:
-        raise ValueError(f"Variable 'norm_value' must be an element of [0, 1], received {norm_value}")
-
-    rgb_fff = (255, 255, 255)
-    if norm_value < 0.5:
-        tuple_diff = np.subtract(rgb_fff, rgb_min)
-        norm_value = (0.5 - norm_value)/0.5
-        rgb_out = tuple(int(f - float(v)*norm_value) for f, v in zip(rgb_fff, tuple_diff))
-    elif norm_value == 0.5:
-        rgb_out = rgb_fff
-    else:
-        tuple_diff = np.subtract(rgb_fff, rgb_max)
-        norm_value = (norm_value-0.5)/0.5
-        rgb_out = tuple(int(f - float(v)*norm_value) for f, v in zip(rgb_fff, tuple_diff))
-    return rgb_out
-
-
-def bwr_color(value: int) -> tuple:
-    """
-    Parameters
-    ----------
-    value: int
-        Expects a 0-1 normalized value.
-        x <= 0 results in a blue color.
-        0.5 results in white.
-        x >= 1 results in red
-
-    Returns
-    -------
-    tuple
-        (r,g,b)
-
-    """
-    value = int(value * 255)  # must be int, otherwise value will be red
-    cmap = mpl.colormaps.get_cmap('bwr')
-    rgb_tuple = tuple(map(lambda x: int(x * 255), cmap(value)))[:3]  # split off the alpha
-    return rgb_tuple
-
+    df_concat = pd.concat(df_slices_list, axis=0).sort_index(ascending=True, axis=0)
+    return df_concat.set_index("index"), tuple_match
 
 
 # plotting
 # ----------------------------------------------------------------------------------------------------------------------
-
 def add_heatmap_tile(figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple, info_str: str, showlegend=False):
     figure_obj.add_trace(go.Scatter(x=coordinates_xy[0],  # top-right, bottom-right, bottom-left, top-left
                                     y=coordinates_xy[1],
@@ -297,10 +115,6 @@ def add_heatmap_tile(figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple, i
                                     name=info_str,
                                     hoverinfo="text",
                                     showlegend=showlegend))
-
-
-def list_transpose(l: list) -> list:
-    return list(map(list, zip(*l)))
 
 
 # correct one to use
@@ -349,24 +163,25 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
         min_val = 0
     # normalized dataframe --> 0-1 min-max
     df_norm = slice_data.map(lambda x: round((x - min_val) / (max_val - min_val), 2))
-    len_x, len_y = df_norm.shape
 
     # position of bins
     bin_df = df_cnv[slice_data_list]
 
-    ##############
-    # HOVER TEXT #
-    ##############
+    #########################
+    # HOVER TEXT & Plotting #
+    #########################
     list_genomic_pos_hm_tile = [f"{row["CHR"]} | {row["START"]} - {row["END"]}" for _, row in bin_df.iterrows()]
 
-    df_gene_loc = get_gene_loc(assembly_genome)
-    #list_genomic_pos_genes = [get_gene_string(df_gene_loc, row["CHR"], row["START"], row["END"]) for _, row in bin_df.iterrows()]
+    # counting chromosome tag occurrences for second plot with bin regions --> CHR fig on top of CNA fig
+    list_chr_tag_count = [tag.split(" |")[0].replace("chr", "Chromosome ") for tag in list_genomic_pos_hm_tile]
+    count_dict_chr = dict(Counter(list_chr_tag_count))
 
+
+    slice_pos, _ = calc_absolute_bin_position(bin_df, assembly_genome)
+    list_genes_text = slice_pos["genes_txt"].tolist()  # list with all genes per bin
     list_genomic_arm_tag = map_arm_by_chr_pos(bin_df, df_arms)
-
-    list_text = [[item]*len(col_data) for item in list_genomic_arm_tag]
+    list_text = [[arm_tag]*len(col_data) for arm_tag in list_genomic_arm_tag]
     list_text_t = np.array(list_transpose(list_text))
-    print(list_text_t.shape)
 
     labels_dict = dict(
         y="cells",
@@ -374,7 +189,72 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
         color="normalized CNA-value"
     )
 
-    fig = px.imshow(df_norm.T.to_numpy(),
+    # create a multiplot
+    # ------------------
+    fig_vstack = make_subplots(rows=2,
+                               cols=1,
+                               shared_xaxes=True,
+                               vertical_spacing=0.02)
+
+    # top plot describing chromosome positions and genes located at the respective bins
+    # colors  --> alternating
+    c1_chr = "#a448f0"  # chromosome total bin color
+    c2_chr = "#413be3"
+    b1_chr = "#ac60eb"  # genomic region bin within chromosome color
+    b2_chr = "#5a55e6"
+
+    colorscale = [[0, c1_chr],
+                  [1, c2_chr],
+                  [2, b1_chr],
+                  [3, b2_chr]]
+
+    bin_size = len(col_data)
+    blank_list = [""]*bin_size
+
+    # bottom bin (genes for each genomic region)
+    bin_color_list = [(x%2) + 2 for x in range(1, bin_size+1, 1)]
+    bin_hover_list = [f"genSeg {i+1}<br>{txt[0]}<br>{txt[1]}<br>{txt[2]}" for i, txt in enumerate(zip(list_genomic_pos_hm_tile, list_genomic_arm_tag, list_genes_text))]
+
+    # top bin (chromosomes)
+    list_chr_color = []
+    list_chr_text = []
+    i = 1
+    for name_key, len_bin_chr_abs in count_dict_chr.items():
+        list_color = [i%2]*len_bin_chr_abs
+        list_chr_color.extend(list_color)
+
+        sub_list_text = []
+        len_mid_point = int(len_bin_chr_abs/2)
+        len_rest = len_bin_chr_abs-(len_mid_point+1)
+        sub_list_text.extend([""]*len_mid_point)
+        sub_list_text.append(name_key)
+        sub_list_text.extend([""] * len_rest)
+        list_chr_text.extend(sub_list_text)
+
+        i += 1
+
+    top_hover_arr = np.array([blank_list,
+                              bin_hover_list])
+    top_txt_arr = np.array([list_chr_text,
+                            blank_list])
+    top_color_arr = np.array([list_chr_color,
+                              bin_color_list])
+
+    # top plot
+    # --------
+    top_fig = ff.create_annotated_heatmap(top_color_arr[::-1],
+                                          annotation_text=top_txt_arr[::-1],
+                                          text=top_hover_arr[::-1],
+                                          colorscale=colorscale,
+                                          font_colors=['black'],
+                                          hoverinfo='text')
+    fig_vstack.add_trace(top_fig,
+                         row=1,
+                         col=1)
+
+    # main CNA plot
+    # -------------
+    cna_fig = px.imshow(df_norm.T.to_numpy(),
                     y=list(df_norm.columns),
                     x=list_genomic_pos_hm_tile,
                     labels = labels_dict,
@@ -382,52 +262,17 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
                     aspect="auto",
                     title=f"InferCNA plot | {path_cnv_csv.stem}",
                     color_continuous_scale=["#303bd9", "#ffffff", "#f258fc"])
-    fig.update_layout(title_font_size=24)
-    fig.update(data=[{"customdata": list_text_t, "hovertemplate":"data: %{customdata}"}])
-    plotly.offline.plot(fig, filename=str(parent_path / f"{path_cnv_csv.stem}.html"))
+    cna_fig.update_layout(title_font_size=24)
+    cna_fig.update_xaxes(showticklabels=False)
+    cna_fig.update(data=[{"customdata": list_text_t,
+                      "hovertemplate":"CELL || %{y} <br>val-CNA | %{z}% <br>%{x} <br>%{customdata}"}])
 
+    fig_vstack.add_trace(cna_fig,
+                         row=2,
+                         col=1)
 
-# DEPRECATED
-# ----------------------------------------------------------------------------------------------------------------------
+    plotly.offline.plot(fig_vstack, filename=str(parent_path / f"plot__{path_cnv_csv.stem}.html"))
 
-# too laggy to use
-def build_cnv_plot(path_json: (str, Path), header: (str, None) = None):
-    """
-    Parameters
-    ----------
-    path_json: str | Path
-    header: str | None
-    """
-    path_json = Path(path_json)
-    path_out = path_json.parent
-
-    # import HSON file
-    json_dict = ut.get_json_dict(path_json)
-
-    # figure construction
-    # -------------------
-    if header is None:
-        header = path_json.stem.split("__")[0]
-    fig = go.Figure()
-    fig.update_layout(title=f"CNV prediction | {header}",
-                      yaxis_title="cell entities",
-                      xaxis_title="unified chromosomal position",
-                      yaxis= dict(
-                          tickmode = "array",
-                          tickvals = json_dict["cells_y_pos"],
-                          ticktext = json_dict["cell_tags"]
-                      ))
-    # chromosomes
-    for sub_dict_val in json_dict["chr"].values():
-        add_heatmap_tile(fig, showlegend=False, **sub_dict_val)
-
-    # heatmap tiles
-    for sub_dict_val in json_dict["cells"].values():
-        add_heatmap_tile(fig, showlegend=False, **sub_dict_val)
-
-    # export as html for easy and fast access
-    fig.write_html(path_out / f"{header}.html")  # we have a sorting issue with the algorithm
-# ----------------------------------------------------------------------------------------------------------------------
 
 
 # docker testing
