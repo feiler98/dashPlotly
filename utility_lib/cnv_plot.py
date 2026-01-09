@@ -174,7 +174,17 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
 
     # counting chromosome tag occurrences for second plot with bin regions --> CHR fig on top of CNA fig
     list_chr_tag_count = [tag.split(" |")[0].replace("chr", "Chromosome ") for tag in list_genomic_pos_hm_tile]
-    count_dict_chr = dict(Counter(list_chr_tag_count))
+    count_dict_chr = dict(Counter(list_chr_tag_count))  # is in order -> len list == length of square
+
+    # convert chromosome dictionary to dictionary with coordinates
+    dict_chr_bin_draw = {}
+    for i, key, val in zip(range(0, len(count_dict_chr), 1), list(count_dict_chr.keys()), list(count_dict_chr.values())):
+        sum_start = sum(list(count_dict_chr.values())[:i])
+        start_pos = list_genomic_pos_hm_tile[sum_start]
+        end_pos = list_genomic_pos_hm_tile[sum_start+val-1]
+        top = 2
+        bottom = 1
+        dict_chr_bin_draw[key] = ((start_pos, start_pos, end_pos, end_pos), (top, bottom, bottom, top))
 
 
     slice_pos, _ = calc_absolute_bin_position(bin_df, assembly_genome)
@@ -191,65 +201,42 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
 
     # create a multiplot
     # ------------------
-    fig_vstack = make_subplots(rows=2,
+    fig_vstack = make_subplots(rows=3,
                                cols=1,
                                shared_xaxes=True,
-                               vertical_spacing=0.02)
+                               vertical_spacing=0.02,
+                               row_heights=[0.05, 0.05, 0.90])
 
     # top plot describing chromosome positions and genes located at the respective bins
-    # colors  --> alternating
-    c1_chr = "#a448f0"  # chromosome total bin color
-    c2_chr = "#413be3"
-    b1_chr = "#ac60eb"  # genomic region bin within chromosome color
-    b2_chr = "#5a55e6"
+    # colors --> alternating
 
-    colorscale = [[0, c1_chr],
-                  [1, c2_chr],
-                  [2, b1_chr],
-                  [3, b2_chr]]
-
-    bin_size = len(col_data)
-    blank_list = [""]*bin_size
+    bin_size = len(df_norm)
 
     # bottom bin (genes for each genomic region)
-    bin_color_list = [(x%2) + 2 for x in range(1, bin_size+1, 1)]
-    bin_hover_list = [f"genSeg {i+1}<br>{txt[0]}<br>{txt[1]}<br>{txt[2]}" for i, txt in enumerate(zip(list_genomic_pos_hm_tile, list_genomic_arm_tag, list_genes_text))]
+    bin_color_list = [(x%2)*0.1 + 0.5 for x in range(1, bin_size+1, 1)]
+    bin_hover_list = [f"genoSeg || {i+1}<br>{txt[0]}<br>{txt[1]}<br>genes:<br>   {txt[2]}" for i, txt in enumerate(zip(list_genomic_pos_hm_tile, list_genomic_arm_tag, list_genes_text))]
 
-    # top bin (chromosomes)
-    list_chr_color = []
-    list_chr_text = []
+
+    # top plots
+    # ---------
+    middle_fig = px.imshow([bin_color_list],
+                            y=["genes"],
+                            x=list_genomic_pos_hm_tile,
+                            labels = labels_dict,
+                            text_auto=False,
+                            aspect="auto",
+                            color_continuous_scale=["#303bd9", "#ffffff", "#f258fc"])
+    middle_fig.update(data=[{"customdata": [bin_hover_list],
+                          "hovertemplate":"%{customdata}"}])
+
+    color_chr_bin = [(67, 98, 209), (198, 82, 204)]
     i = 1
-    for name_key, len_bin_chr_abs in count_dict_chr.items():
-        list_color = [i%2]*len_bin_chr_abs
-        list_chr_color.extend(list_color)
-
-        sub_list_text = []
-        len_mid_point = int(len_bin_chr_abs/2)
-        len_rest = len_bin_chr_abs-(len_mid_point+1)
-        sub_list_text.extend([""]*len_mid_point)
-        sub_list_text.append(name_key)
-        sub_list_text.extend([""] * len_rest)
-        list_chr_text.extend(sub_list_text)
-
+    for key, tup_coords in dict_chr_bin_draw.items():
+        add_heatmap_tile(middle_fig, coordinates_xy=tup_coords, rgb=color_chr_bin[i%2], info_str=key)
         i += 1
 
-    top_hover_arr = np.array([blank_list,
-                              bin_hover_list])
-    top_txt_arr = np.array([list_chr_text,
-                            blank_list])
-    top_color_arr = np.array([list_chr_color,
-                              bin_color_list])
-
-    # top plot
-    # --------
-    top_fig = ff.create_annotated_heatmap(top_color_arr[::-1],
-                                          annotation_text=top_txt_arr[::-1],
-                                          text=top_hover_arr[::-1],
-                                          colorscale=colorscale,
-                                          font_colors=['black'],
-                                          hoverinfo='text')
-    fig_vstack.add_trace(top_fig,
-                         row=1,
+    fig_vstack.add_trace(middle_fig.data[0],
+                         row=2,
                          col=1)
 
     # main CNA plot
@@ -259,19 +246,21 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
                     x=list_genomic_pos_hm_tile,
                     labels = labels_dict,
                     text_auto=False,
-                    aspect="auto",
-                    title=f"InferCNA plot | {path_cnv_csv.stem}",
-                    color_continuous_scale=["#303bd9", "#ffffff", "#f258fc"])
+                    aspect="auto")
     cna_fig.update_layout(title_font_size=24)
-    cna_fig.update_xaxes(showticklabels=False)
     cna_fig.update(data=[{"customdata": list_text_t,
-                      "hovertemplate":"CELL || %{y} <br>val-CNA | %{z}% <br>%{x} <br>%{customdata}"}])
+                          "hovertemplate":"CELL || %{y} <br>val-CNA | %{z}% <br>%{x} <br>%{customdata}"}])
 
-    fig_vstack.add_trace(cna_fig,
-                         row=2,
+    fig_vstack.add_trace(cna_fig.data[0],
+                         row=3,
                          col=1)
+    fig_vstack.update_layout(title_font_size=38,
+                             title_text=f"InferCNA plot | {path_cnv_csv.stem}")
+    fig_vstack.update_xaxes(showticklabels=False)
+    fig_vstack.update_layout(coloraxis=dict(colorscale=[[0, "#303bd9"], [0.5, "#ffffff"], [1.0, "#f27933"]]),
+                             showlegend=False)
 
-    plotly.offline.plot(fig_vstack, filename=str(parent_path / f"plot__{path_cnv_csv.stem}.html"))
+    plotly.offline.plot(fig_vstack , filename=str(parent_path / f"plot__{path_cnv_csv.stem}.html"))
 
 
 
