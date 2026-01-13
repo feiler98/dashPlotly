@@ -105,18 +105,6 @@ def calc_absolute_bin_position(df_chr_bins: pd.DataFrame, assembly_genome: str =
 
 # plotting
 # ----------------------------------------------------------------------------------------------------------------------
-def add_heatmap_tile(figure_obj: go.Figure, coordinates_xy: tuple, rgb: tuple, info_str: str, showlegend=False):
-    figure_obj.add_trace(go.Scatter(x=coordinates_xy[0],  # top-right, bottom-right, bottom-left, top-left
-                                    y=coordinates_xy[1],
-                                    fill='toself',
-                                    fillcolor=f"rgb{tuple(rgb)}",
-                                    line={"width":0},
-                                    marker=None,
-                                    mode='lines',
-                                    name=info_str,
-                                    hoverinfo="text",
-                                    showlegend=showlegend))
-
 
 # correct one to use
 def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38", zero_one_norm: bool = False):
