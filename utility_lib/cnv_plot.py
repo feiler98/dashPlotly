@@ -4,7 +4,6 @@ import plotly
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
-import plotly.figure_factory as ff
 from pathlib import Path
 from pyomics import utils as ut
 from collections import Counter
@@ -18,6 +17,8 @@ import numpy as np
 # -----------------
 # x-axis connected figures in dash plotly --> https://stackoverflow.com/questions/75871154/plotly-share-x-axis-for-subset-of-subplots
 # periodic table of elements --> https://plotly.com/python/annotated-heatmap/
+# subplots --> https://plotly.com/python/table-subplots/
+
 
 # data genomic data
 general_data_path = Path(__file__).parent.parent / "data" / "genome"
@@ -170,28 +171,26 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
     #########################
     # HOVER TEXT & Plotting #
     #########################
-    list_genomic_pos_hm_tile = [f"{row["CHR"]} | {row["START"]} - {row["END"]}" for _, row in bin_df.iterrows()]
-
-    # counting chromosome tag occurrences for second plot with bin regions --> CHR fig on top of CNA fig
-    list_chr_tag_count = [tag.split(" |")[0].replace("chr", "Chromosome ") for tag in list_genomic_pos_hm_tile]
-    count_dict_chr = dict(Counter(list_chr_tag_count))  # is in order -> len list == length of square
-
-    # convert chromosome dictionary to dictionary with coordinates
-    dict_chr_bin_draw = {}
-    for i, key, val in zip(range(0, len(count_dict_chr), 1), list(count_dict_chr.keys()), list(count_dict_chr.values())):
-        sum_start = sum(list(count_dict_chr.values())[:i])
-        start_pos = list_genomic_pos_hm_tile[sum_start]
-        end_pos = list_genomic_pos_hm_tile[sum_start+val-1]
-        top = 2
-        bottom = 1
-        dict_chr_bin_draw[key] = ((start_pos, start_pos, end_pos, end_pos), (top, bottom, bottom, top))
-
+    list_genomic_pos_hm_tile = [f"{row["CHR"]} | {int(row["START"])} - {int(row["END"])}" for _, row in bin_df.iterrows()]
 
     slice_pos, _ = calc_absolute_bin_position(bin_df, assembly_genome)
     list_genes_text = slice_pos["genes_txt"].tolist()  # list with all genes per bin
     list_genomic_arm_tag = map_arm_by_chr_pos(bin_df, df_arms)
     list_text = [[arm_tag]*len(col_data) for arm_tag in list_genomic_arm_tag]
     list_text_t = np.array(list_transpose(list_text))
+
+    # counting chromosome tag occurrences for second plot with bin regions --> CHR fig on top of CNA fig
+    list_chr_tag_count = [tag.split(" |")[0].replace("chr", "Chromosome ") for tag in list_genomic_pos_hm_tile]
+    count_dict_chr = dict(Counter(list_chr_tag_count))  # is in order -> len list == length of square
+
+    list_chr_info = []
+    list_chr_val = []
+
+    for i, key, val in zip(range(0, len(count_dict_chr), 1), list(count_dict_chr.keys()),
+                           list(count_dict_chr.values())):
+        list_chr_info.extend([key] * val)
+        list_chr_val.extend([(i % 2) * -0.5 - 0.5] * val)
+    list_chr_info_update = [f"{chr_tag}<br>   {arm}" for chr_tag, arm in zip(list_chr_info, list_genomic_arm_tag)]
 
     labels_dict = dict(
         y="cells",
@@ -214,26 +213,31 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
 
     # bottom bin (genes for each genomic region)
     bin_color_list = [(x%2)*0.1 + 0.5 for x in range(1, bin_size+1, 1)]
-    bin_hover_list = [f"genoSeg || {i+1}<br>{txt[0]}<br>{txt[1]}<br>genes:<br>   {txt[2]}" for i, txt in enumerate(zip(list_genomic_pos_hm_tile, list_genomic_arm_tag, list_genes_text))]
+    bin_hover_list = [f"GenoSeg | {i+1}<br>{txt[0]}<br>{txt[1]}<br>genes:<br>   {txt[2]}" for i, txt in enumerate(zip(list_genomic_pos_hm_tile, list_genomic_arm_tag, list_genes_text))]
 
 
-    # top plots
-    # ---------
-    middle_fig = px.imshow([bin_color_list],
-                            y=["genes"],
-                            x=list_genomic_pos_hm_tile,
-                            labels = labels_dict,
-                            text_auto=False,
-                            aspect="auto",
-                            color_continuous_scale=["#303bd9", "#ffffff", "#f258fc"])
-    middle_fig.update(data=[{"customdata": [bin_hover_list],
+    # chromosome plot
+    # ---------------
+    top_fig = px.imshow([list_chr_val],
+                        y=["Chromosomes"],
+                        x=list_genomic_pos_hm_tile,
+                        text_auto=False,
+                        aspect="auto")
+    top_fig.update(data=[{"customdata": [list_chr_info_update],
                           "hovertemplate":"%{customdata}"}])
 
-    color_chr_bin = [(67, 98, 209), (198, 82, 204)]
-    i = 1
-    for key, tup_coords in dict_chr_bin_draw.items():
-        add_heatmap_tile(middle_fig, coordinates_xy=tup_coords, rgb=color_chr_bin[i%2], info_str=key)
-        i += 1
+    fig_vstack.add_trace(top_fig.data[0],
+                         row=1,
+                         col=1)
+    # gene plot
+    # ---------
+    middle_fig = px.imshow([bin_color_list],
+                            y=["Genes"],
+                            x=list_genomic_pos_hm_tile,
+                            text_auto=False,
+                            aspect="auto")
+    middle_fig.update(data=[{"customdata": [bin_hover_list],
+                          "hovertemplate":"%{customdata}"}])
 
     fig_vstack.add_trace(middle_fig.data[0],
                          row=2,
@@ -249,7 +253,7 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
                     aspect="auto")
     cna_fig.update_layout(title_font_size=24)
     cna_fig.update(data=[{"customdata": list_text_t,
-                          "hovertemplate":"CELL || %{y} <br>val-CNA | %{z}% <br>%{x} <br>%{customdata}"}])
+                          "hovertemplate":"Cell | %{y} <br>   val-CNA | %{z} <br>   %{x} <br>   %{customdata}"}])
 
     fig_vstack.add_trace(cna_fig.data[0],
                          row=3,
