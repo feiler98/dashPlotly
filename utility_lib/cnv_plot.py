@@ -18,6 +18,8 @@ import numpy as np
 # x-axis connected figures in dash plotly --> https://stackoverflow.com/questions/75871154/plotly-share-x-axis-for-subset-of-subplots
 # periodic table of elements --> https://plotly.com/python/annotated-heatmap/
 # subplots --> https://plotly.com/python/table-subplots/
+# subplots api --> https://plotly.com/python-api-reference/generated/plotly.subplots.make_subplots.html
+# layout settings --> https://plotly.com/python/reference/layout/
 
 
 # data genomic data
@@ -246,12 +248,15 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
     fig_vstack.add_trace(cna_fig.data[0],
                          row=3,
                          col=1)
-    fig_vstack.update_layout(title_font_size=38,
-                             title_text=f"InferCNA plot | {path_cnv_csv.stem}")
     fig_vstack.update_xaxes(showticklabels=False)
     fig_vstack.update_layout(coloraxis=dict(colorscale=[[0, "#303bd9"], [0.5, "#ffffff"], [1.0, "#f27933"]]),
-                             showlegend=False)
+                             showlegend=False,
+                             height=1500, width=1800,
+                             title_font_size=38,
+                             title_text=f"InferCNA plot | {path_cnv_csv.stem}")
 
+    # plot, show, and save figure
+    # ---------------------------
     plotly.offline.plot(fig_vstack , filename=str(parent_path / f"plot__{path_cnv_csv.stem}.html"))
 
 
