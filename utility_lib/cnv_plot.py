@@ -161,6 +161,7 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
     #########################
     # HOVER TEXT & Plotting #
     #########################
+    vstack_plot_height = int((1/0.87) * 1.1 * len(col_data))
     list_genomic_pos_hm_tile = [f"{row["CHR"]} | {int(row["START"])} - {int(row["END"])}" for _, row in bin_df.iterrows()]
 
     slice_pos, _ = calc_absolute_bin_position(bin_df, assembly_genome)
@@ -190,11 +191,17 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
 
     # create a multiplot
     # ------------------
-    fig_vstack = make_subplots(rows=3,
+    # CNA figures & plots
+    main_vstack = make_subplots(rows=2,
+                                cols=1,
+                                vertical_spacing=0.02)
+
+    # CNA figures
+    fig_vstack = make_subplots(rows=4,
                                cols=1,
                                shared_xaxes=True,
                                vertical_spacing=0.02,
-                               row_heights=[0.05, 0.05, 0.90])
+                               row_heights=[0.05, 0.05, 0.03, 0.87])
 
     # top plot describing chromosome positions and genes located at the respective bins
     # colors --> alternating
@@ -233,6 +240,21 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
                          row=2,
                          col=1)
 
+    # main-sum CNA plot
+    # -----------------
+    cna_fig = px.imshow([df_norm.T.mean(axis=0).to_numpy()],
+                    y=["summarized CNA"],
+                    x=list_genomic_pos_hm_tile,
+                    labels = labels_dict,
+                    text_auto=False,
+                    aspect="auto")
+    cna_fig.update(data=[{"customdata": [list_text_t[0]],
+                          "hovertemplate":"Cell | %{y} <br>   val-CNA | %{z} <br>   %{x} <br>   %{customdata}"}])
+
+    fig_vstack.add_trace(cna_fig.data[0],
+                         row=3,
+                         col=1)
+
     # main CNA plot
     # -------------
     cna_fig = px.imshow(df_norm.T.to_numpy(),
@@ -241,17 +263,18 @@ def build_cnv_heatmap(path_cnv_csv: (str | Path), assembly_genome: str = "hg_38"
                     labels = labels_dict,
                     text_auto=False,
                     aspect="auto")
-    cna_fig.update_layout(title_font_size=24)
     cna_fig.update(data=[{"customdata": list_text_t,
                           "hovertemplate":"Cell | %{y} <br>   val-CNA | %{z} <br>   %{x} <br>   %{customdata}"}])
 
     fig_vstack.add_trace(cna_fig.data[0],
-                         row=3,
+                         row=4,
                          col=1)
+
+    # settings of fig_vstack
     fig_vstack.update_xaxes(showticklabels=False)
     fig_vstack.update_layout(coloraxis=dict(colorscale=[[0, "#303bd9"], [0.5, "#ffffff"], [1.0, "#f27933"]]),
+                             height=vstack_plot_height,
                              showlegend=False,
-                             height=1500, width=1800,
                              title_font_size=38,
                              title_text=f"InferCNA plot | {path_cnv_csv.stem}")
 
