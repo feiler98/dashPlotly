@@ -1,7 +1,6 @@
 # import
 # ----------------------------------------------------------------------------------------------------------------------
 from pathlib import Path
-from pyomics import utils as ut
 import pandas as pd
 import multiprocessing as mp
 import os
