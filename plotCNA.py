@@ -185,8 +185,13 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     # create a multiplot
     # ------------------
+    # std settings
+    col_pos = 1
+    col_width = [1]
+
+
     fig_vstack = make_subplots(rows=5,
-                               cols=2,
+                               cols=col_pos,
                                shared_xaxes=True,
                                vertical_spacing=0.02,
                                row_heights=[chr_bin_height/vstack_height,
@@ -194,12 +199,12 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                                             sum_cna_height/vstack_height,
                                             main_cna_height/vstack_height,
                                             table_height/vstack_height],
-                               column_widths=[0, 1],
-                               specs=[[{"type": "xy"}, {"type": "xy"}],
-                                      [{"type": "xy"}, {"type": "xy"}],
-                                      [{"type": "xy"}, {"type": "xy"}],
-                                      [{"type": "xy"}, {"type": "xy"}],
-                                      [{"type": "table"}, {"type": "table"}]])
+                               column_widths=col_width,
+                               specs=[[{"type": "xy"}]*col_pos,
+                                      [{"type": "xy"}]*col_pos,
+                                      [{"type": "xy"}]*col_pos,
+                                      [{"type": "xy"}]*col_pos,
+                                      [{"type": "table"}]*col_pos])
 
     # top plot describing chromosome positions and genes located at the respective bins
     # colors --> alternating
@@ -224,7 +229,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     fig_vstack.add_trace(top_fig.data[0],
                          row=1,
-                         col=2)
+                         col=col_pos)
     # gene plot
     # ---------
     middle_fig = px.imshow([bin_color_list],
@@ -237,7 +242,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     fig_vstack.add_trace(middle_fig.data[0],
                          row=2,
-                         col=2)
+                         col=col_pos)
 
     # main-sum CNA plot
     # -----------------
@@ -251,7 +256,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     fig_vstack.add_trace(cna_fig.data[0],
                          row=3,
-                         col=2)
+                         col=col_pos)
 
     # main CNA plot
     # -------------
@@ -265,7 +270,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     fig_vstack.add_trace(cna_fig.data[0],
                          row=4,
-                         col=2)
+                         col=col_pos)
 
     # table
     # -----
@@ -285,7 +290,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     fig_vstack.add_trace(table_summary,
                           row=5,
-                          col=2)
+                          col=col_pos)
 
     # settings of fig_vstack
     fig_vstack.update_xaxes(showticklabels=False)
