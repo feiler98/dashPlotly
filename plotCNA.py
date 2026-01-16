@@ -14,7 +14,8 @@ import numpy as np
 from utility_lib import (calc_absolute_bin_position,
                          map_arm_by_chr_pos,
                          list_transpose,
-                         calc_pred_saturation)
+                         calc_pred_saturation,
+                         list_transpose)
 # ----------------------------------------------------------------------------------------------------------------------
 
 # helpful resources
@@ -145,7 +146,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     gene_height = 35
     sum_cna_height = 35
     main_cna_height = len(col_data)
-    table_height = 400
+    table_height = 350
     chr_length = 600
 
 
@@ -181,7 +182,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     print("> mapping of chromosomal bins [✓]")
 
     # create table underneath plot
-    df_summary = calc_pred_saturation(bin_df, assembly_genome)
+    df_summary, dict_chr_bar = calc_pred_saturation(bin_df, assembly_genome)
     print("> generation of summary table [✓]")
 
     # create a multiplot
@@ -197,7 +198,6 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     fig_vstack = make_subplots(rows=6,
                                cols=col_pos,
-                               shared_xaxes=True,
                                vertical_spacing=0.02,
                                row_heights=[chr_bin_height/vstack_height,
                                             gene_height/vstack_height,
@@ -307,17 +307,26 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     # chromosomal barplot
     # -------------------
+    chr_multi_bar = [go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["q_abs"], marker_color='rgb(69, 73, 135)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
+                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["q"], marker_color='rgb(242, 48, 129)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
+                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["p_abs"], marker_color='rgb(69, 73, 135)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
+                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["p"], marker_color='rgb(53, 185, 242)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%"))]
 
-    chr_multi_bar = [go.Bar(x=["A", "B", "C", "D"], y=[-100, -70, -100, -70], marker_color='rgb(69, 73, 135)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
-                     go.Bar(x=["A", "B", "C", "D"], y=[-30, -50, -100, -70], marker_color='rgb(242, 48, 129)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
-                     go.Bar(x=["A", "B", "C", "D"], y=[65, 50, 60, 30], marker_color='rgb(69, 73, 135)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
-                     go.Bar(x=["A", "B", "C", "D"], y=[20, 10, 0, 20], marker_color='rgb(53, 185, 242)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%"))]
+    # the plural of add_trace since a list of items! --> often a silly mistake
+    fig_vstack.add_traces(chr_multi_bar,
+                          rows=6,
+                          cols=col_pos)
 
-    fig_vstack.add_trace(chr_multi_bar,
-                          row=6,
-                          col=col_pos)
+    fig_vstack.update_traces(selector=dict(type='bar'),
+                             customdata=list_transpose([dict_chr_bar["q_info"],
+                                                        dict_chr_bar["q_info"],
+                                                        dict_chr_bar["p_info"],
+                                                        dict_chr_bar["p_info"]]),
+                             hovertemplate="%{x}<br>%{customdata}<extra></extra>")
 
-    # settings of fig_vstack
+    ##########################
+    # settings of fig_vstack #
+    ##########################
     fig_vstack.update_xaxes(showticklabels=False)
     fig_vstack.update_layout(coloraxis=dict(colorscale=[[0, "#303bd9"], [0.5, "#ffffff"], [1.0, "#f27933"]],
                                             colorbar=dict(len=int(main_cna_height*0.7),
@@ -328,7 +337,17 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                              title_font_size=38,
                              title_text=f"InferCNA plot {f'| {data_title}' if data_title is not None else ""}",
                              plot_bgcolor='rgb(34, 37, 87)',
-                             barmode="overlay", yaxis6=dict(showgrid=False, showticklabels=False))
+                             barmode="overlay")
+
+    # locked axis
+    fig_vstack.update_xaxes(row=1, col=col_pos, matches='x')
+    fig_vstack.update_xaxes(row=2, col=col_pos, matches='x')
+    fig_vstack.update_xaxes(row=3, col=col_pos, matches='x')
+    fig_vstack.update_xaxes(row=4, col=col_pos, matches='x')
+
+    # overlay barplot
+    fig_vstack.update_xaxes(row=6, col=col_pos, showgrid=False, showticklabels=True)
+    fig_vstack.update_yaxes(row=6, col=col_pos, showgrid=False, showticklabels=False)
 
     print("> generation of html document [✓]")
 

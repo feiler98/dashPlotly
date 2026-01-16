@@ -4,6 +4,9 @@ from pathlib import Path
 import pandas as pd
 import multiprocessing as mp
 import os
+
+from statsmodels.graphics.tsaplots import plot_predict
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 # helpful resources
@@ -117,23 +120,47 @@ def calc_pred_saturation(df_cna_idx, assembly_genome: str = "hg_38"):
     df_chr_total_len = pd.read_csv(Path(general_data_path / f"{assembly_genome}__chr_bin_lengths__ucsc.csv"),
                                    index_col="CHR")
     dict_df = {"":["chrom<br>pred<br>saturation", "p-arm<br>pred<br>saturation", "q-arm<br>pred<br>saturation"]}
+    list_len_p_abs = []
+    list_len_q_abs = []
+    list_len_p = []
+    list_len_q = []
+    info_p_arm_list = []
+    info_q_arm_list = []
+    info_chr_list = []
     for idx, row in df_chr_total_len.iterrows():
         if not idx in df_cna_idx_unique_chr_list:
             continue
+        info_chr_list.append(str(idx).replace("chr", "Chromosome "))
         breakpoint_q = df_arms.where(df_arms["CHR"] == idx).dropna().set_index("tag_arm").loc["q", "START"]
-        list_df_filter = [df_cna_idx.where(df_cna_idx["CHR"] == idx).dropna(),
-                          df_cna_idx.where((df_cna_idx["CHR"] == idx) & (df_cna_idx["END"] <= breakpoint_q)).dropna(),
-                          df_cna_idx.where((df_cna_idx["CHR"] == idx) & (df_cna_idx["START"] >= breakpoint_q)).dropna()]
+        list_df_filter = [(df_cna_idx.where(df_cna_idx["CHR"] == idx).dropna(), row["bin_size"]),
+                          (df_cna_idx.where((df_cna_idx["CHR"] == idx) & (df_cna_idx["END"] <= breakpoint_q)).dropna(), breakpoint_q),
+                          (df_cna_idx.where((df_cna_idx["CHR"] == idx) & (df_cna_idx["START"] >= breakpoint_q)).dropna(), row["bin_size"]-breakpoint_q)]
         list_percentages_per_section = []
-        for section_df in list_df_filter:
+        for section_df, chr_bin_size in list_df_filter:
             chr_slice_sum_diff = sum(list(section_df["DIFF"]))
-            chr_diff_percent = round((chr_slice_sum_diff/row["bin_size"])*100, 2)
-            list_percentages_per_section.append(f"<br>{chr_diff_percent} %")
+            chr_diff_percent = round((chr_slice_sum_diff/chr_bin_size)*100, 2)
+            list_percentages_per_section.append(f"{chr_diff_percent} %")
+        p_abs = list_df_filter[1][1]
+        q_abs = list_df_filter[2][1]
+        p_pred = sum(list(list_df_filter[1][0]["DIFF"]))
+        q_pred = sum(list(list_df_filter[2][0]["DIFF"]))
+        list_len_p_abs.append(p_abs)
+        list_len_q_abs.append(-q_abs)
+        list_len_p.append(p_pred)
+        list_len_q.append(-q_pred)
+        info_p_arm_list.append(f"total_length | {p_abs} bp<br> pred | {p_pred} bp<br>pred-% | {list_percentages_per_section[1]}")
+        info_q_arm_list.append(f"total_length | {q_abs} bp<br> pred | {q_pred} <br>pred-% | {list_percentages_per_section[2]}")
         dict_df[f"<br>{str(idx)}"] = list_percentages_per_section
 
     total_diff_percent = round((sum(list(df_cna_idx["DIFF"]))/sum(list(df_chr_total_len["bin_size"])))*100, 2)
-    dict_df["total<br>Genome"] = [f"<br>{total_diff_percent} %", " - ", " - "]
-    return pd.DataFrame.from_dict(dict_df)
+    dict_df["total<br>Genome"] = [f"{total_diff_percent} %", " - ", " - "]
+    return pd.DataFrame.from_dict(dict_df), {"chr": info_chr_list,
+                                             "q_info": info_q_arm_list,
+                                             "q":list_len_q,
+                                             "q_abs":list_len_q_abs,
+                                             "p_info": info_p_arm_list,
+                                             "p":list_len_p,
+                                             "p_abs":list_len_p_abs}
 
 
 # Debugging
