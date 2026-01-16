@@ -146,9 +146,10 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     sum_cna_height = 35
     main_cna_height = len(col_data)
     table_height = 400
+    chr_length = 600
 
 
-    vstack_height = table_height+main_cna_height+sum_cna_height+gene_height+chr_bin_height
+    vstack_height = table_height+main_cna_height+sum_cna_height+gene_height+chr_bin_height+chr_length
 
     list_genomic_pos_hm_tile = [f"{row["CHR"]} | {int(row["START"])} - {int(row["END"])}" for _, row in
                                 bin_df.iterrows()]
@@ -194,7 +195,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
         col_pos = 2
         col_width = [2]
 
-    fig_vstack = make_subplots(rows=5,
+    fig_vstack = make_subplots(rows=6,
                                cols=col_pos,
                                shared_xaxes=True,
                                vertical_spacing=0.02,
@@ -202,13 +203,16 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                                             gene_height/vstack_height,
                                             sum_cna_height/vstack_height,
                                             main_cna_height/vstack_height,
-                                            table_height/vstack_height],
+                                            table_height/vstack_height,
+                                            chr_length/vstack_height],
                                column_widths=col_width,
                                specs=[[{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
-                                      [{"type": "table"}]*col_pos])
+                                      [{"type": "table"}]*col_pos,
+                                      [{"type": "bar"}]*col_pos]
+                               )
 
     # adjust width if additional data
     if df_cellclass is not None:
@@ -300,6 +304,19 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                           row=5,
                           col=col_pos)
 
+
+    # chromosomal barplot
+    # -------------------
+
+    chr_multi_bar = [go.Bar(x=["A", "B", "C", "D"], y=[-100, -70, -100, -70], marker_color='rgb(69, 73, 135)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
+                     go.Bar(x=["A", "B", "C", "D"], y=[-30, -50, -100, -70], marker_color='rgb(242, 48, 129)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
+                     go.Bar(x=["A", "B", "C", "D"], y=[65, 50, 60, 30], marker_color='rgb(69, 73, 135)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
+                     go.Bar(x=["A", "B", "C", "D"], y=[20, 10, 0, 20], marker_color='rgb(53, 185, 242)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%"))]
+
+    fig_vstack.add_trace(chr_multi_bar,
+                          row=6,
+                          col=col_pos)
+
     # settings of fig_vstack
     fig_vstack.update_xaxes(showticklabels=False)
     fig_vstack.update_layout(coloraxis=dict(colorscale=[[0, "#303bd9"], [0.5, "#ffffff"], [1.0, "#f27933"]],
@@ -309,7 +326,9 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                              showlegend=False,
                              title_font_weight="bold",
                              title_font_size=38,
-                             title_text=f"InferCNA plot {f'| {data_title}' if data_title is not None else ""}")
+                             title_text=f"InferCNA plot {f'| {data_title}' if data_title is not None else ""}",
+                             plot_bgcolor='rgb(34, 37, 87)',
+                             barmode="overlay", yaxis6=dict(showgrid=False, showticklabels=False))
 
     print("> generation of html document [✓]")
 
