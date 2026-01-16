@@ -105,6 +105,9 @@ def calc_pred_saturation(df_cna_idx, assembly_genome: str = "hg_38"):
     slice_data_list = ["CHR", "START", "END"]
     available_cols = list(df_cna_idx.columns)
 
+    # import data
+    df_arms = pd.read_csv(general_data_path / f"{assembly_genome}__loc_qp_arm.csv")
+
     # check input
     for col_tags in slice_data_list:
         if not col_tags in available_cols :
@@ -113,16 +116,23 @@ def calc_pred_saturation(df_cna_idx, assembly_genome: str = "hg_38"):
     df_cna_idx_unique_chr_list = list(df_cna_idx["CHR"].unique())
     df_chr_total_len = pd.read_csv(Path(general_data_path / f"{assembly_genome}__chr_bin_lengths__ucsc.csv"),
                                    index_col="CHR")
-    dict_df = {"":["pred<br>saturation"]}
+    dict_df = {"":["chrom<br>pred<br>saturation", "p-arm<br>pred<br>saturation", "q-arm<br>pred<br>saturation"]}
     for idx, row in df_chr_total_len.iterrows():
         if not idx in df_cna_idx_unique_chr_list:
             continue
-        chr_slice_sum_diff = sum(list(df_cna_idx.where(df_cna_idx["CHR"] == idx).dropna()["DIFF"]))
-        chr_diff_percent = round((chr_slice_sum_diff/row["bin_size"])*100, 2)
-        dict_df[f"<br>{str(idx)}"] = [f"<br>{chr_diff_percent} %"]
+        breakpoint_q = df_arms.where(df_arms["CHR"] == idx).dropna().set_index("tag_arm").loc["q", "START"]
+        list_df_filter = [df_cna_idx.where(df_cna_idx["CHR"] == idx).dropna(),
+                          df_cna_idx.where((df_cna_idx["CHR"] == idx) & (df_cna_idx["END"] <= breakpoint_q)).dropna(),
+                          df_cna_idx.where((df_cna_idx["CHR"] == idx) & (df_cna_idx["START"] >= breakpoint_q)).dropna()]
+        list_percentages_per_section = []
+        for section_df in list_df_filter:
+            chr_slice_sum_diff = sum(list(section_df["DIFF"]))
+            chr_diff_percent = round((chr_slice_sum_diff/row["bin_size"])*100, 2)
+            list_percentages_per_section.append(f"<br>{chr_diff_percent} %")
+        dict_df[f"<br>{str(idx)}"] = list_percentages_per_section
 
     total_diff_percent = round((sum(list(df_cna_idx["DIFF"]))/sum(list(df_chr_total_len["bin_size"])))*100, 2)
-    dict_df["total<br>Genome"] = [f"<br>{total_diff_percent} %"]
+    dict_df["total<br>Genome"] = [f"<br>{total_diff_percent} %", " - ", " - "]
     return pd.DataFrame.from_dict(dict_df)
 
 

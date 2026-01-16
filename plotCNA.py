@@ -145,7 +145,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     gene_height = 35
     sum_cna_height = 35
     main_cna_height = len(col_data)
-    table_height = 150
+    table_height = 400
 
 
     vstack_height = table_height+main_cna_height+sum_cna_height+gene_height+chr_bin_height
@@ -189,6 +189,10 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     col_pos = 1
     col_width = [1]
 
+    # change col layout if additional data
+    if df_cellclass is not None:
+        col_pos = 2
+        col_width = [2]
 
     fig_vstack = make_subplots(rows=5,
                                cols=col_pos,
@@ -205,6 +209,10 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                                       [{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
                                       [{"type": "table"}]*col_pos])
+
+    # adjust width if additional data
+    if df_cellclass is not None:
+        fig_vstack.update_layout(col_width=[0.1, 0.9])
 
     # top plot describing chromosome positions and genes located at the respective bins
     # colors --> alternating
