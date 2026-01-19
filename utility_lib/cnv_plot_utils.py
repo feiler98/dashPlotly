@@ -148,8 +148,8 @@ def calc_pred_saturation(df_cna_idx, assembly_genome: str = "hg_38"):
         list_len_q_abs.append(-q_abs)
         list_len_p.append(p_pred)
         list_len_q.append(-q_pred)
-        info_p_arm_list.append(f"total_length | {p_abs} bp<br> pred | {p_pred} bp<br>pred-% | {list_percentages_per_section[1]}")
-        info_q_arm_list.append(f"total_length | {q_abs} bp<br> pred | {q_pred} <br>pred-% | {list_percentages_per_section[2]}")
+        info_p_arm_list.append(f"   total_length | {p_abs} bp<br>   pred | {p_pred} bp<br>   pred-% | {list_percentages_per_section[1]}")
+        info_q_arm_list.append(f"   total_length | {q_abs} bp<br>   pred | {q_pred} <br>   pred-% | {list_percentages_per_section[2]}")
         dict_df[f"<br>{str(idx)}"] = list_percentages_per_section
 
     total_diff_percent = round((sum(list(df_cna_idx["DIFF"]))/sum(list(df_chr_total_len["bin_size"])))*100, 2)

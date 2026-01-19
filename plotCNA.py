@@ -198,7 +198,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     fig_vstack = make_subplots(rows=6,
                                cols=col_pos,
-                               vertical_spacing=0.02,
+                               vertical_spacing=0.01,
                                row_heights=[chr_bin_height/vstack_height,
                                             gene_height/vstack_height,
                                             sum_cna_height/vstack_height,
@@ -225,14 +225,14 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     # bottom bin (genes for each genomic region)
     bin_color_list = [(x%2)*0.1 + 0.5 for x in range(1, bin_size+1, 1)]
-    bin_hover_list = [f"GenoSeg | {i+1}<br>{txt[0]}<br>{txt[1]}<br>genes:<br>   {txt[2]}" for i, txt in
+    bin_hover_list = [f"<b>GenoSeg | {i+1}</b><br>{txt[0]}<br>{txt[1]}<br>genes:<br>   {txt[2]}" for i, txt in
                       enumerate(zip(list_genomic_pos_hm_tile, list_genomic_arm_tag, list_genes_text))]
     print("> generation of hover text [✓]")
 
     # chromosome plot
     # ---------------
     top_fig = px.imshow([list_chr_val, list_chr_arm_val][::-1],
-                        y=["Chromosomes", "Chrom. arm"][::-1],
+                        y=["<b>Chromosomes</b>", "<b>Chrom. arm</b>"][::-1],
                         x=list_genomic_pos_hm_tile,
                         text_auto=False,
                         aspect="auto")
@@ -245,7 +245,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     # gene plot
     # ---------
     middle_fig = px.imshow([bin_color_list],
-                            y=["Genes"],
+                            y=["<b>Genes</b>"],
                             x=list_genomic_pos_hm_tile,
                             text_auto=False,
                             aspect="auto")
@@ -259,12 +259,12 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     # main-sum CNA plot
     # -----------------
     cna_fig = px.imshow([df_norm.T.mean(axis=0).to_numpy()],
-                    y=["summarized CNA"],
+                    y=["<b>summarized CNA</b>"],
                     x=list_genomic_pos_hm_tile,
                     text_auto=False,
                     aspect="auto")
     cna_fig.update(data=[{"customdata": [list_text_t[0]],
-                          "hovertemplate":"Cell | %{y} <br>   val-CNA | %{z} <br>   %{x} <br>   %{customdata} <extra></extra>"}])
+                          "hovertemplate":"<b>Cell | %{y} </b><br>   val-CNA | %{z} <br>   %{x} <br>   %{customdata} <extra></extra>"}])
 
     fig_vstack.add_trace(cna_fig.data[0],
                          row=3,
@@ -278,7 +278,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                     text_auto=False,
                     aspect="auto")
     cna_fig.update(data=[{"customdata": list_text_t,
-                          "hovertemplate":"Cell | %{y} <br>   val-CNA | %{z} <br>   %{x} <br>   %{customdata} <extra></extra>"}])
+                          "hovertemplate":"<b>Cell | %{y} </b><br>   val-CNA | %{z} <br>   %{x} <br>   %{customdata} <extra></extra>"}])
 
     fig_vstack.add_trace(cna_fig.data[0],
                          row=4,
@@ -289,13 +289,15 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     table_summary = go.Table(
         header=dict(
             values=list(df_summary.columns),
-            fill=dict(color="#c9365b"),
+            line_color='rgb(34, 37, 87)',
+            fill=dict(color="rgb(242, 48, 129)"),
             font=dict(size=15, color="white", weight="bold"),
             align="center"
         ),
         cells=dict(
             values=[df_summary[c].tolist() for c in df_summary.columns],
-            fill=dict(color="#e05175"),
+            line_color='rgb(34, 37, 87)',
+            fill=dict(color="rgb(207, 70, 127)"),
             font=dict(size=12, color="white"),
             align="center")
     )
@@ -307,36 +309,64 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     # chromosomal barplot
     # -------------------
-    chr_multi_bar = [go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["q_abs"], marker_color='rgb(69, 73, 135)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
-                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["q"], marker_color='rgb(242, 48, 129)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
-                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["p_abs"], marker_color='rgb(69, 73, 135)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%")),
-                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["p"], marker_color='rgb(53, 185, 242)', marker_line_color='rgba(0,0,0,0)', marker=dict(cornerradius="100%"))]
+    chr_multi_bar = [go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["q_abs"],
+                            customdata=dict_chr_bar["q_info"],
+                            hovertemplate="<b>%{x} | q-arm</b><br>%{customdata}<extra></extra>",
+                            marker_color='rgb(69, 73, 135)',
+                            marker_line_color='rgba(255,255,255,1)',
+                            marker_line_width=2,
+                            marker=dict(cornerradius="100%")),
+                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["q"],
+                            customdata=dict_chr_bar["q_info"],
+                            hovertemplate="<b>%{x} | q-arm</b><br>%{customdata}<extra></extra>",
+                            marker_color='rgb(242, 48, 129)',
+                            marker_line_color='rgba(255,255,255,1)',
+                            marker_line_width=1,
+                            marker=dict(cornerradius="100%")),
+                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["p_abs"],
+                            customdata=dict_chr_bar["p_info"],
+                            hovertemplate="<b>%{x} | p-arm</b><br>%{customdata}<extra></extra>",
+                            marker_color='rgb(69, 73, 135)',
+                            marker_line_color='rgba(255,255,255,1)',
+                            marker_line_width=2,
+                            marker=dict(cornerradius="100%")),
+                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["p"],
+                            customdata=dict_chr_bar["p_info"],
+                            hovertemplate="<b>%{x} p-arm</b><br>%{customdata}<extra></extra>",
+                            marker_color='rgb(53, 185, 242)',
+                            marker_line_color='rgba(255,255,255,1)',
+                            marker_line_width=1,
+                            marker=dict(cornerradius="100%"))]
 
     # the plural of add_trace since a list of items! --> often a silly mistake
     fig_vstack.add_traces(chr_multi_bar,
                           rows=6,
                           cols=col_pos)
 
-    fig_vstack.update_traces(selector=dict(type='bar'),
-                             customdata=list_transpose([dict_chr_bar["q_info"],
-                                                        dict_chr_bar["q_info"],
-                                                        dict_chr_bar["p_info"],
-                                                        dict_chr_bar["p_info"]]),
-                             hovertemplate="%{x}<br>%{customdata}<extra></extra>")
-
     ##########################
     # settings of fig_vstack #
     ##########################
-    fig_vstack.update_xaxes(showticklabels=False)
-    fig_vstack.update_layout(coloraxis=dict(colorscale=[[0, "#303bd9"], [0.5, "#ffffff"], [1.0, "#f27933"]],
+    fig_vstack.update_xaxes(showticklabels=False, tickangle=-45)
+    fig_vstack.update_layout(coloraxis=dict(colorscale=[[0, "#009bde"], [0.5, "#dedede"], [1.0, "#f23081"]],
                                             colorbar=dict(len=int(main_cna_height*0.7),
-                                                          lenmode="pixels")),
+                                                          lenmode="pixels",
+                                                          title="CNA-value",
+                                                          yanchor="top",
+                                                          margin=dict(t="100px"),
+                                                          y=1,
+                                                          dtick=0.25,
+                                                          labelalias={1: "gain",
+                                                                      0: "neutral",
+                                                                      -1: "loss"})),
                              height=vstack_height,
                              showlegend=False,
+                             hoverlabel=dict(font=dict(color='white')),
                              title_font_weight="bold",
                              title_font_size=38,
                              title_text=f"InferCNA plot {f'| {data_title}' if data_title is not None else ""}",
+                             font=dict(color='rgb(222, 222, 222)'),
                              plot_bgcolor='rgb(34, 37, 87)',
+                             paper_bgcolor='rgb(34, 37, 87)',
                              barmode="overlay")
 
     # locked axis
