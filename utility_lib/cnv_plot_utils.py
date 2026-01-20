@@ -2,11 +2,12 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from pathlib import Path
 import pandas as pd
+import numpy as np
 import multiprocessing as mp
 import os
 
-from statsmodels.graphics.tsaplots import plot_predict
-
+# disable SettingWithCopyWarning
+pd.options.mode.chained_assignment = None
 # ----------------------------------------------------------------------------------------------------------------------
 
 # helpful resources
@@ -61,7 +62,7 @@ def get_gene_loc(assembly_genome: str = "hg_38") -> pd.DataFrame:
 def get_gene_string(df_get_gene_loc: pd.DataFrame, chr_tag: str, start_pos: int, end_pos: int) -> str:
     df_slice = df_get_gene_loc.where((df_get_gene_loc["CHR"] == chr_tag) & (df_get_gene_loc["START"] >= start_pos) & (
                                       df_get_gene_loc["END"] <= end_pos)).dropna()
-    return "<br>   ".join(list(set(df_slice["gene"])))
+    return "<br>      ".join(list(set(df_slice["gene"])))
 
 
 def df_chunk_splitter(df: pd.DataFrame, chunk_amount: int) -> list:
@@ -150,8 +151,8 @@ def calc_pred_saturation(df_cna_idx, assembly_genome: str = "hg_38"):
         list_len_q_abs.append(-q_abs)
         list_len_p.append(p_pred)
         list_len_q.append(-q_pred)
-        info_p_arm_list.append(f"   total_length | {int(p_abs)} bp<br>   pred | {int(p_pred)} bp<br>   pred-% | {list_percentages_per_section[1]}")
-        info_q_arm_list.append(f"   total_length | {int(q_abs)} bp<br>   pred | {int(q_pred)} bp<br>   pred-% | {list_percentages_per_section[2]}")
+        info_p_arm_list.append(f"   total length | {int(p_abs)} bp<br>   pred | {int(p_pred)} bp<br>   pred % | {list_percentages_per_section[1]}")
+        info_q_arm_list.append(f"   total length | {int(q_abs)} bp<br>   pred | {int(q_pred)} bp<br>   pred % | {list_percentages_per_section[2]}")
         dict_df[f"<br>{str(idx)}"] = list_percentages_per_section
 
     total_diff_percent = round((sum(list(df_cna_idx["DIFF"]))/sum(list(df_chr_total_len["bin_size"])))*100, 2)
@@ -166,13 +167,24 @@ def calc_pred_saturation(df_cna_idx, assembly_genome: str = "hg_38"):
 
 
 def sort_df_row_by_similarity(df):
-    max_diff_from_zero_array_idx = int(df.abs().sum(axis=1).sort_values(ascending=False).index[0])
+    max_diff_from_zero_array_idx = df.abs().sum(axis=1).sort_values(ascending=False).index[0]
     list_row_max_diff = df.loc[max_diff_from_zero_array_idx, :]
     df_subtract = pd.DataFrame([list_row_max_diff]*len(df), index=df.index, columns=df.columns)
     df_diff = df.sub(df_subtract)
     df["SORT_DF"] = df_diff.abs().sum(axis=1)
     df.sort_values("SORT_DF", inplace=True, ascending=True)
     return df.drop("SORT_DF", axis=1)
+
+
+def encode_df_name_cols(df):
+    col_list = list(df.columns)
+    dict_encode = {}
+    for col_names in col_list:
+        unique_tags = list(df[col_names].unique())
+        encoded_nums = list(np.arange(0, 1, 1/len(unique_tags)))
+        dict_encoded_col = {tag: num for tag, num in zip(unique_tags, encoded_nums)}
+        dict_encode[col_names] = dict_encoded_col
+    return dict_encode
 
 
 # Debugging

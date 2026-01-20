@@ -13,9 +13,10 @@ import numpy as np
 # local imports
 from utility_lib import (calc_absolute_bin_position,
                          map_arm_by_chr_pos,
-                         list_transpose,
+                         sort_df_row_by_similarity,
                          calc_pred_saturation,
-                         list_transpose)
+                         list_transpose,
+                         encode_df_name_cols)
 # ----------------------------------------------------------------------------------------------------------------------
 
 # helpful resources
@@ -67,6 +68,12 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
         Genome the original UMI-matrix / BAM-file was mapped to; available: 'hg_19', 'hg_38'.
     """
 
+    # initializing the function
+    print_init = f"Construction of heatmap{f' {data_title}' if data_title is not None else ""}"
+    print(f"""
+{print_init}""")
+    print("-"*len(print_init))
+
     # setting up the plotting dependencies
     # ------------------------------------
     list_available_genome = [p.stem.split("__")[0] for p in general_data_path.glob("*.gtf")]
@@ -85,6 +92,8 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     slice_data_list = ["CHR", "START", "END"]
     col_data = [c for c in df_cnv.columns if c not in slice_data_list]
 
+    # df_cellclass | sorting the data by tags
+    # ------------------------------------------------------------------------------------------------------------------
     # additional data in form of cell classes (col 1 of 2)
     if df_cellclass is not None:
         idx_cellclass = list(df_cellclass.index)
@@ -93,36 +102,48 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
             raise ValueError("Provided DataFrame 'df_cellclass' must have a union with the CNV-matrix > 0!")
 
         # if union > 0 --> use union_cells as col_data list
-        df_cellclass = df_cellclass.loc[union_cells, ::]
+        df_cellclass = df_cellclass.loc[union_cells, :]
         flag_sort = False
         if df_cellclass_classify_by is not None:
             if not str(df_cellclass_classify_by) in df_cellclass.columns:
                 raise ValueError(f"Column '{df_cellclass_classify_by}' is not in DataFrame 'df_cellclass'!")
-            if df_cellclass_filter_col:
-                df_cellclass = df_cellclass[df_cellclass_classify_by]
-            # sort if passed
-            if sort:
-                'FIX HERE'
-                flag_sort = True
+        else:
+            df_cellclass_classify_by = df_cellclass.columns[0]
+        if df_cellclass_filter_col:
+            df_cellclass = df_cellclass[df_cellclass_classify_by]
+        # sort if passed
+        if sort:
+            unique_list_col = list(df_cellclass[df_cellclass_classify_by].unique())
+            list_sub_slices = [sort_df_row_by_similarity(df_cnv[df_cellclass[df_cellclass[df_cellclass_classify_by] == unique_tag].dropna().index].T).T for unique_tag in unique_list_col]
+            slice_data = pd.concat(list_sub_slices, axis=1)
+            df_cellclass = df_cellclass.loc[list(slice_data.columns), :]
+            flag_sort = True
         col_data = list(df_cellclass.index)
         print(f"> Matching, {"filtering, and sorting" if flag_sort else "and filtering"} of cell-classification [✓]")
-
-    # true values of CNV method
-    slice_data = df_cnv[col_data]
+        # true values of CNV method
+        slice_data = df_cnv[col_data]
+    else:
+        if sort:
+            # true values of CNV method
+            slice_data = sort_df_row_by_similarity(df_cnv[col_data].T).T
+            col_data = list(slice_data.columns)
+            print(
+            f"> Sorting data [✓]")
+        else:
+            # true values of CNV method
+            slice_data = df_cnv[col_data]
+    # ------------------------------------------------------------------------------------------------------------------
 
     # min-max normalization of the data
     # ---------------------------------
     max_val = abs(slice_data.max().max())
     min_val = abs(slice_data.min().min())
     # centering 0
-    if max_val > min_val:
-        min_val = -max_val
-    else:
+    if max_val < min_val:
         max_val = min_val
-        min_val = -min_val
 
     # normalized dataframe --> 0-1 min-max
-    df_norm = slice_data.map(lambda x: round((x - min_val) / (max_val - min_val), 2))
+    df_norm = slice_data.map(lambda x: round(x / (max_val), 2))
     print("> normalization of data [✓]")
 
 
@@ -137,7 +158,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     # ----------------------------
     chr_bin_height = 70
     gene_height = 35
-    sum_cna_height = 35
+    sum_cna_height = 35 + 35*(len(df_cellclass.columns) if df_cellclass is not None else 0)
     main_cna_height = len(col_data)
     table_height = 350
     chr_length = 600
@@ -218,7 +239,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     # bottom bin (genes for each genomic region)
     bin_color_list = [(x%2)*0.1 + 0.5 for x in range(1, bin_size+1, 1)]
-    bin_hover_list = [f"<b>GenoSeg | {i+1}</b><br>{txt[0]}<br>{txt[1]}<br>genes:<br>   {txt[2]}" for i, txt in
+    bin_hover_list = [f"<b>GenoSeg | {i+1}</b><br>   {txt[0]}<br>   {txt[1]}<br>   genes:<br>      {txt[2]}" for i, txt in
                       enumerate(zip(list_genomic_pos_hm_tile, list_genomic_arm_tag, list_genes_text))]
     print("> generation of hover text [✓]")
 
@@ -276,6 +297,39 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     fig_vstack.add_trace(cna_fig.data[0],
                          row=4,
                          col=col_pos)
+
+    # expansion plot for showing cell characteristics
+    # -----------------------------------------------
+    if df_cellclass is not None:
+        color_gradient = [[0, "#009bde"],
+                          [0.2, "#533fb5"],
+                          [0.35, "#f23081"],
+                          [0.5, "#cf3d36"],
+                          [0.65, "#c98b3e"],
+                          [0.8, "#81b349"],
+                          [1.0, "#409c49"]]
+        # encode the classes
+        dict_encode = encode_df_name_cols(df_cellclass)
+        df_cellclass_sub = df_cellclass.copy()
+        for col_tag, dict_encode_col in dict_encode.items():
+            df_cellclass_sub[col_tag] = df_cellclass[col_tag].map(lambda x: dict_encode_col[x])
+
+        cellclass_info_arr = df_cellclass.to_numpy()
+
+        cell_fig = px.imshow(df_cellclass_sub.to_numpy(),
+                            y=list(df_cellclass.index),
+                            x=list(df_cellclass.columns),
+                            text_auto=False,
+                            aspect="auto",
+                            color_continuous_scale=color_gradient)   # will it work?
+
+        cell_fig.update(data=[{"customdata": cellclass_info_arr,
+                              "hovertemplate": "<b>Cell | %{y} </b><br>   %{customdata} <extra></extra>"}])
+
+        cell_fig.update_coloraxes(showscale=False)
+        fig_vstack.add_trace(cell_fig.data[0],
+                             row=4,
+                             col=1)
 
     # table
     # -----
@@ -342,16 +396,18 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     # settings of fig_vstack #
     ##########################
     fig_vstack.update_xaxes(showticklabels=False, tickangle=-45, tickfont=dict(size=15))
-    fig_vstack.update_layout(coloraxis=dict(colorscale=[[0, "#009bde"], [0.5, "#dedede"], [1.0, "#f23081"]],
+    fig_vstack.update_layout(coloraxis=dict(colorscale=[[0, "#009bde"],
+                                                        [0.5, "#dedede"],
+                                                        [1.0, "#f23081"]],
                                             colorbar=dict(len=main_cna_height,
                                                           lenmode="pixels",
                                                           title="<b>CNA-value</b>",
                                                           yanchor="top",
                                                           y=1,
                                                           dtick=0.25,
-                                                          labelalias={1: "gain",
-                                                                      0: "neutral",
-                                                                      -1: "loss"})),
+                                                          labelalias={1: "<b>gain</b>",
+                                                                      0: "<b>neutral</b>",
+                                                                      -1: "<b>loss</b>"})),
                              height=vstack_height,
                              showlegend=False,
                              hoverlabel=dict(font=dict(color='white')),
@@ -373,6 +429,11 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     fig_vstack.update_xaxes(row=6, col=col_pos, showgrid=False, showticklabels=True)
     fig_vstack.update_yaxes(row=6, col=col_pos, showgrid=False, showticklabels=False)
 
+    # lock cell-tag axis horizontally
+    if df_cellclass is not None:
+        fig_vstack.update_yaxes(row=4, col=2, matches='y')
+        fig_vstack.update_yaxes(row=4, col=1, matches='y')
+
     print("> generation of html document [✓]")
 
     # plot, show, and save figure
@@ -384,4 +445,4 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 # docker testing
 if __name__ == "__main__":
     path_ck_cnv = Path(__file__).parent / "data" / "test_cnv_plot"
-    build_cnv_heatmap(pd.read_csv(path_ck_cnv / "copykat_curated.csv"))
+    build_cnv_heatmap(pd.read_csv(path_ck_cnv / "copykat_curated.csv"), sort=True)
