@@ -39,10 +39,9 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                       data_title: str = None,
                       df_cellclass: (pd.DataFrame | None)  = None,
                       df_cellclass_classify_by: (str | None) = None,
-                      sort: str = False,
+                      sort: bool = False,
                       df_cellclass_filter_col: bool = False,
-                      assembly_genome: str = "hg_38",
-                      zero_one_norm: bool = False):
+                      assembly_genome: str = "hg_38"):
     """
     Creates an express plotly imshow heatmap of infercnv data.
 
@@ -59,14 +58,13 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     df_cellclass_classify_by: str | None
         None -> applies order as received; takes first column for CNA-mean calculation
         str -> column name of DataFrame.
-    sort: str
-        Sorts df_cellclass by target column if 'ascending' or 'descending' tags are provided, otherwise disabled.
+    sort: bool
+        If 'True' sorts the rows per section descending; most dissimilar array to 0 array on top,
+        increasing dissimilarity between top row to bottom rows.
     df_cellclass_filter_col: bool
         Removes all columns that are not used for the primary classification if True.
     assembly_genome: str
         Genome the original UMI-matrix / BAM-file was mapped to; available: 'hg_19', 'hg_38'.
-    zero_one_norm: bool
-        If True, range 0 to 1, else -1 to 1
     """
 
     # setting up the plotting dependencies
@@ -103,11 +101,8 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
             if df_cellclass_filter_col:
                 df_cellclass = df_cellclass[df_cellclass_classify_by]
             # sort if passed
-            dict_sort = {"ascending": True, "descending": False}
-            if str(sort) in dict_sort.keys():
-                df_cellclass = df_cellclass.sort_values(df_cellclass_classify_by,
-                                                        ascending=dict_sort[str(sort)],
-                                                        axis=0)
+            if sort:
+                'FIX HERE'
                 flag_sort = True
         col_data = list(df_cellclass.index)
         print(f"> Matching, {"filtering, and sorting" if flag_sort else "and filtering"} of cell-classification [✓]")
@@ -126,8 +121,6 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
         max_val = min_val
         min_val = -min_val
 
-    if not zero_one_norm:
-        min_val = 0
     # normalized dataframe --> 0-1 min-max
     df_norm = slice_data.map(lambda x: round((x - min_val) / (max_val - min_val), 2))
     print("> normalization of data [✓]")
@@ -175,7 +168,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                            list(count_dict_chr.values())):
         list_chr_info.extend([key] * val)
         list_chr_val.extend([((i+1) % 2) * -0.3 - 0.6] * val)
-    list_chr_info_update = [f"{chr_tag}<br>   {arm}" for chr_tag, arm in zip(list_chr_info, list_genomic_arm_tag)]
+    list_chr_info_update = [f"<b>{chr_tag}</b><br>   {arm}" for chr_tag, arm in zip(list_chr_info, list_genomic_arm_tag)]
     dict_chr_arm_encode = {"chr-arm | p": -0.3,"chr-arm | q": -0.1}
     list_chr_arm_val = list(map(dict_chr_arm_encode.get, list_genomic_arm_tag))
 
@@ -309,28 +302,30 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     # chromosomal barplot
     # -------------------
-    chr_multi_bar = [go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["q_abs"],
+    chr_tag_barplot_bold = [f"<b>{chr_tag}</b>" for chr_tag in dict_chr_bar["chr"]]
+
+    chr_multi_bar = [go.Bar(x=chr_tag_barplot_bold , y=dict_chr_bar["q_abs"],
                             customdata=dict_chr_bar["q_info"],
                             hovertemplate="<b>%{x} | q-arm</b><br>%{customdata}<extra></extra>",
                             marker_color='rgb(69, 73, 135)',
                             marker_line_color='rgba(255,255,255,1)',
                             marker_line_width=2,
                             marker=dict(cornerradius="100%")),
-                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["q"],
+                     go.Bar(x=chr_tag_barplot_bold , y=dict_chr_bar["q"],
                             customdata=dict_chr_bar["q_info"],
                             hovertemplate="<b>%{x} | q-arm</b><br>%{customdata}<extra></extra>",
                             marker_color='rgb(242, 48, 129)',
                             marker_line_color='rgba(255,255,255,1)',
                             marker_line_width=1,
                             marker=dict(cornerradius="100%")),
-                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["p_abs"],
+                     go.Bar(x=chr_tag_barplot_bold , y=dict_chr_bar["p_abs"],
                             customdata=dict_chr_bar["p_info"],
                             hovertemplate="<b>%{x} | p-arm</b><br>%{customdata}<extra></extra>",
                             marker_color='rgb(69, 73, 135)',
                             marker_line_color='rgba(255,255,255,1)',
                             marker_line_width=2,
                             marker=dict(cornerradius="100%")),
-                     go.Bar(x=dict_chr_bar["chr"], y=dict_chr_bar["p"],
+                     go.Bar(x=chr_tag_barplot_bold , y=dict_chr_bar["p"],
                             customdata=dict_chr_bar["p_info"],
                             hovertemplate="<b>%{x} p-arm</b><br>%{customdata}<extra></extra>",
                             marker_color='rgb(53, 185, 242)',
@@ -346,13 +341,12 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     ##########################
     # settings of fig_vstack #
     ##########################
-    fig_vstack.update_xaxes(showticklabels=False, tickangle=-45)
+    fig_vstack.update_xaxes(showticklabels=False, tickangle=-45, tickfont=dict(size=15))
     fig_vstack.update_layout(coloraxis=dict(colorscale=[[0, "#009bde"], [0.5, "#dedede"], [1.0, "#f23081"]],
-                                            colorbar=dict(len=int(main_cna_height*0.7),
+                                            colorbar=dict(len=main_cna_height,
                                                           lenmode="pixels",
-                                                          title="CNA-value",
+                                                          title="<b>CNA-value</b>",
                                                           yanchor="top",
-                                                          margin=dict(t="100px"),
                                                           y=1,
                                                           dtick=0.25,
                                                           labelalias={1: "gain",

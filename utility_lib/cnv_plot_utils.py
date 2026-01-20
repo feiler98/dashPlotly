@@ -119,7 +119,9 @@ def calc_pred_saturation(df_cna_idx, assembly_genome: str = "hg_38"):
     df_cna_idx_unique_chr_list = list(df_cna_idx["CHR"].unique())
     df_chr_total_len = pd.read_csv(Path(general_data_path / f"{assembly_genome}__chr_bin_lengths__ucsc.csv"),
                                    index_col="CHR")
-    dict_df = {"":["chrom<br>pred<br>saturation", "p-arm<br>pred<br>saturation", "q-arm<br>pred<br>saturation"]}
+    dict_df = {"":["<b>chrom<br>pred<br>saturation</b>",
+                   "<b>p-arm<br>pred<br>saturation</b>",
+                   "<b>q-arm<br>pred<br>saturation</b>"]}
     list_len_p_abs = []
     list_len_q_abs = []
     list_len_p = []
@@ -148,8 +150,8 @@ def calc_pred_saturation(df_cna_idx, assembly_genome: str = "hg_38"):
         list_len_q_abs.append(-q_abs)
         list_len_p.append(p_pred)
         list_len_q.append(-q_pred)
-        info_p_arm_list.append(f"   total_length | {p_abs} bp<br>   pred | {p_pred} bp<br>   pred-% | {list_percentages_per_section[1]}")
-        info_q_arm_list.append(f"   total_length | {q_abs} bp<br>   pred | {q_pred} <br>   pred-% | {list_percentages_per_section[2]}")
+        info_p_arm_list.append(f"   total_length | {int(p_abs)} bp<br>   pred | {int(p_pred)} bp<br>   pred-% | {list_percentages_per_section[1]}")
+        info_q_arm_list.append(f"   total_length | {int(q_abs)} bp<br>   pred | {int(q_pred)} bp<br>   pred-% | {list_percentages_per_section[2]}")
         dict_df[f"<br>{str(idx)}"] = list_percentages_per_section
 
     total_diff_percent = round((sum(list(df_cna_idx["DIFF"]))/sum(list(df_chr_total_len["bin_size"])))*100, 2)
@@ -161,6 +163,16 @@ def calc_pred_saturation(df_cna_idx, assembly_genome: str = "hg_38"):
                                              "p_info": info_p_arm_list,
                                              "p":list_len_p,
                                              "p_abs":list_len_p_abs}
+
+
+def sort_df_row_by_similarity(df):
+    max_diff_from_zero_array_idx = int(df.abs().sum(axis=1).sort_values(ascending=False).index[0])
+    list_row_max_diff = df.loc[max_diff_from_zero_array_idx, :]
+    df_subtract = pd.DataFrame([list_row_max_diff]*len(df), index=df.index, columns=df.columns)
+    df_diff = df.sub(df_subtract)
+    df["SORT_DF"] = df_diff.abs().sum(axis=1)
+    df.sort_values("SORT_DF", inplace=True, ascending=True)
+    return df.drop("SORT_DF", axis=1)
 
 
 # Debugging
