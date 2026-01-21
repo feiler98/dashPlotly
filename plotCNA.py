@@ -28,6 +28,7 @@ from utility_lib import (calc_absolute_bin_position,
 # layout settings --> https://plotly.com/python/reference/layout/
 # colorbar settings --> https://plotly.com/python/reference/#heatmap-colorbar
 # two coloraxis in subplots --> https://community.plotly.com/t/subplots-of-two-heatmaps-overlapping-text-colourbar/38587/9
+# subplots coloraxis (more promising) --> https://community.plotly.com/t/colorbar-for-each-facet-col/73456
 
 
 # data genomic data
@@ -69,7 +70,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     """
 
     # initializing the function
-    print_init = f"Construction of heatmap{f' {data_title}' if data_title is not None else ""}"
+    print_init = f"Construction of heatmap{f' < {data_title} >' if data_title is not None else ""}"
     print(f"""
 {print_init}""")
     print("-"*len(print_init))
@@ -85,7 +86,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     df_cnv = df_cnv.where(df_cnv["CHR"].isin(allowed_chr_list)).dropna()
     print("> filtering of valid chromosomal-sections [✓]")
 
-    if isinstance(df_cellclass, pd.DataFrame) or df_cellclass is not None:
+    if not isinstance(df_cellclass, pd.DataFrame) and df_cellclass is not None:
         raise ValueError(f"Argument 'df_cellclass' expected (None | pd.DataFrame) as input, received '{type(df_cellclass)}' instead!")
 
     # split the CNV DataFrame into its 2 sections --> multi-index and cells
@@ -156,15 +157,17 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     # plotting element sizes  [px]
     # ----------------------------
-    chr_bin_height = 70
-    gene_height = 35
-    sum_cna_height = 35 + 35*(len(df_cellclass.columns) if df_cellclass is not None else 0)
+    chr_bin_height = 60
+    gene_height = 30
+    sum_cna_height = 30 + 30*(len(df_cellclass.columns) if df_cellclass is not None else 0)
     main_cna_height = len(col_data)
-    table_height = 350
+    space_top_chr = 70
     chr_length = 600
+    space_bottom_chr = 170
+    table_height = 350
 
 
-    vstack_height = table_height+main_cna_height+sum_cna_height+gene_height+chr_bin_height+chr_length
+    vstack_height = table_height+main_cna_height+sum_cna_height+gene_height+chr_bin_height+chr_length+space_top_chr+space_bottom_chr
 
     list_genomic_pos_hm_tile = [f"{row["CHR"]} | {int(row["START"])} - {int(row["END"])}" for _, row in
                                 bin_df.iterrows()]
@@ -205,36 +208,54 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     col_pos = 1
     col_width = [1]
 
+    tuple_title = ("",
+                   "",
+                   "",
+                   "",
+                   "",
+                   "<b>Predictive saturation along the genome</b>",
+                   "",
+                   "")
+
     # change col layout if additional data
     if df_cellclass is not None:
         col_pos = 2
-        col_width = [2]
+        col_width = [0.02*len(df_cellclass.columns), 0.9-0.02*len(df_cellclass.columns)]
+        tuple_title = ("", "",
+                       "", "",
+                       "", "",
+                       "", "",
+                       "", "",
+                       "", "<b>Predictive saturation along the genome</b>",
+                       "", "",
+                       "", "")
 
-    fig_vstack = make_subplots(rows=6,
+    fig_vstack = make_subplots(rows=8,
                                cols=col_pos,
                                vertical_spacing=0.01,
+                               subplot_titles=tuple_title,
+                               horizontal_spacing=0.01,
                                row_heights=[chr_bin_height/vstack_height,
                                             gene_height/vstack_height,
                                             sum_cna_height/vstack_height,
                                             main_cna_height/vstack_height,
-                                            table_height/vstack_height,
-                                            chr_length/vstack_height],
+                                            space_top_chr/vstack_height,
+                                            chr_length/vstack_height,
+                                            space_bottom_chr/vstack_height,
+                                            table_height/vstack_height],
                                column_widths=col_width,
                                specs=[[{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
-                                      [{"type": "table"}]*col_pos,
-                                      [{"type": "bar"}]*col_pos]
+                                      [{"type": "xy"}] * col_pos,
+                                      [{"type": "bar"}]*col_pos,
+                                      [{"type": "xy"}] * col_pos,
+                                      [{"type": "table"}]*col_pos]
                                )
-
-    # adjust width if additional data
-    if df_cellclass is not None:
-        fig_vstack.update_layout(col_width=[0.1, 0.9])
 
     # top plot describing chromosome positions and genes located at the respective bins
     # colors --> alternating
-
     bin_size = len(df_norm)
 
     # bottom bin (genes for each genomic region)
@@ -301,13 +322,6 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     # expansion plot for showing cell characteristics
     # -----------------------------------------------
     if df_cellclass is not None:
-        color_gradient = [[0, "#009bde"],
-                          [0.2, "#533fb5"],
-                          [0.35, "#f23081"],
-                          [0.5, "#cf3d36"],
-                          [0.65, "#c98b3e"],
-                          [0.8, "#81b349"],
-                          [1.0, "#409c49"]]
         # encode the classes
         dict_encode = encode_df_name_cols(df_cellclass)
         df_cellclass_sub = df_cellclass.copy()
@@ -315,13 +329,12 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
             df_cellclass_sub[col_tag] = df_cellclass[col_tag].map(lambda x: dict_encode_col[x])
 
         cellclass_info_arr = df_cellclass.to_numpy()
-
+        col_list_df_cellclass = [f"<b>{idx}</b>" for idx in list(df_cellclass.columns)]
         cell_fig = px.imshow(df_cellclass_sub.to_numpy(),
                             y=list(df_cellclass.index),
-                            x=list(df_cellclass.columns),
+                            x=col_list_df_cellclass,
                             text_auto=False,
-                            aspect="auto",
-                            color_continuous_scale=color_gradient)   # will it work?
+                            aspect="auto")
 
         cell_fig.update(data=[{"customdata": cellclass_info_arr,
                               "hovertemplate": "<b>Cell | %{y} </b><br>   %{customdata} <extra></extra>"}])
@@ -330,29 +343,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
         fig_vstack.add_trace(cell_fig.data[0],
                              row=4,
                              col=1)
-
-    # table
-    # -----
-    table_summary = go.Table(
-        header=dict(
-            values=list(df_summary.columns),
-            line_color='rgb(34, 37, 87)',
-            fill=dict(color="rgb(242, 48, 129)"),
-            font=dict(size=15, color="white", weight="bold"),
-            align="center"
-        ),
-        cells=dict(
-            values=[df_summary[c].tolist() for c in df_summary.columns],
-            line_color='rgb(34, 37, 87)',
-            fill=dict(color="rgb(207, 70, 127)"),
-            font=dict(size=12, color="white"),
-            align="center")
-    )
-
-    fig_vstack.add_trace(table_summary,
-                          row=5,
-                          col=col_pos)
-
+        fig_vstack.data[-1].update(coloraxis="coloraxis2")
 
     # chromosomal barplot
     # -------------------
@@ -392,11 +383,41 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                           rows=6,
                           cols=col_pos)
 
+    # table
+    # -----
+    table_summary = go.Table(
+        header=dict(
+            values=list(df_summary.columns),
+            line_color='rgb(34, 37, 87)',
+            fill=dict(color="rgb(242, 48, 129)"),
+            font=dict(size=15, color="white", weight="bold"),
+            align="center"
+        ),
+        cells=dict(
+            values=[df_summary[c].tolist() for c in df_summary.columns],
+            line_color='rgb(34, 37, 87)',
+            fill=dict(color="rgb(207, 70, 127)"),
+            font=dict(size=12, color="white"),
+            align="center")
+    )
+
+    fig_vstack.add_trace(table_summary,
+                          row=8,
+                          col=col_pos)
+
     ##########################
     # settings of fig_vstack #
     ##########################
     fig_vstack.update_xaxes(showticklabels=False, tickangle=-45, tickfont=dict(size=15))
-    fig_vstack.update_layout(coloraxis=dict(colorscale=[[0, "#009bde"],
+    fig_vstack.update_layout(coloraxis2=dict(colorscale=[[0, "#009bde"],
+                                                         [0.2, "#533fb5"],
+                                                         [0.35, "#f23081"],
+                                                         [0.5, "#cf3d36"],
+                                                         [0.65, "#c98b3e"],
+                                                         [0.8, "#81b349"],
+                                                         [1.0, "#409c49"]],
+                                             showscale=False),
+                             coloraxis=dict(colorscale=[[0, "#009bde"],
                                                         [0.5, "#dedede"],
                                                         [1.0, "#f23081"]],
                                             colorbar=dict(len=main_cna_height,
@@ -431,18 +452,21 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     # lock cell-tag axis horizontally
     if df_cellclass is not None:
-        fig_vstack.update_yaxes(row=4, col=2, matches='y')
+        fig_vstack.update_yaxes(row=4, col=2, matches='y', showticklabels=False)
         fig_vstack.update_yaxes(row=4, col=1, matches='y')
+        fig_vstack.update_xaxes(row=4, col=1, showticklabels=True)
 
     print("> generation of html document [✓]")
 
     # plot, show, and save figure
     # ---------------------------
-    plotly.offline.plot(fig_vstack , filename=str(path_out / f"plot__{str(data_title) if data_title is not None else "infercnv"}.html"))
-
+    plotly.offline.plot(fig_vstack , filename=str(path_out / f"plot__{str(data_title).replace(" ", "_") if data_title is not None else "infercnv"}.html"))
 
 
 # docker testing
 if __name__ == "__main__":
     path_ck_cnv = Path(__file__).parent / "data" / "test_cnv_plot"
-    build_cnv_heatmap(pd.read_csv(path_ck_cnv / "copykat_curated.csv"), sort=True)
+    build_cnv_heatmap(df_cnv=pd.read_csv(path_ck_cnv / "copykat_curated.csv"),
+                      df_cellclass=pd.read_csv(path_ck_cnv / "cells_copykat_scONE_GBM.csv", index_col="cells"),
+                      data_title="copykat with cellclass description",
+                      sort=True)
