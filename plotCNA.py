@@ -159,7 +159,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     # ----------------------------
     chr_bin_height = 60
     gene_height = 30
-    sum_cna_height = 30 + 30*(len(df_cellclass.columns) if df_cellclass is not None else 0)
+    sum_cna_height = 30 + 30*(len(df_cellclass[df_cellclass_classify_by].unique()) if df_cellclass is not None else 0)
     main_cna_height = len(col_data)
     space_top_chr = 70
     chr_length = 600
@@ -248,9 +248,9 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                                       [{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
-                                      [{"type": "xy"}] * col_pos,
+                                      [{"type": "xy"}]*col_pos,
                                       [{"type": "bar"}]*col_pos,
-                                      [{"type": "xy"}] * col_pos,
+                                      [{"type": "xy"}]*col_pos,
                                       [{"type": "table"}]*col_pos]
                                )
 
@@ -293,12 +293,21 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     # main-sum CNA plot
     # -----------------
-    cna_fig = px.imshow([df_norm.T.mean(axis=0).to_numpy()],
-                    y=["<b>summarized CNA</b>"],
+    mean_array_list = [df_norm.T.mean(axis=0).to_numpy()]
+    sum_y = ["<b>summarized CNA</b>"]
+    if df_cellclass is not None:
+        unique_list = list(df_cellclass[df_cellclass_classify_by].unique())
+        for unique_class in unique_list:
+            filter_idx = list(df_cellclass.where(df_cellclass[df_cellclass_classify_by] == unique_class).dropna().index)
+            mean_array_list.append(df_norm[filter_idx].T.mean(axis=0).to_numpy())
+        sum_y.extend([f"<b>{unique_class}</b>" for unique_class in unique_list])
+
+    cna_fig = px.imshow(mean_array_list,
+                    y=sum_y,
                     x=list_genomic_pos_hm_tile,
                     text_auto=False,
                     aspect="auto")
-    cna_fig.update(data=[{"customdata": [list_text_t[0]],
+    cna_fig.update(data=[{"customdata": [list_text_t[0]]*len(sum_y),
                           "hovertemplate":"<b>Cell | %{y} </b><br>   val-CNA | %{z} <br>   %{x} <br>   %{customdata} <extra></extra>"}])
 
     fig_vstack.add_trace(cna_fig.data[0],
