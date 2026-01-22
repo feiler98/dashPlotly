@@ -144,7 +144,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
         max_val = min_val
 
     # normalized dataframe --> 0-1 min-max
-    df_norm = slice_data.map(lambda x: round(x / (max_val), 2))
+    df_norm = slice_data.map(lambda x: round(x / max_val, 2))
     print("> normalization of data [✓]")
 
 
@@ -158,8 +158,11 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     # plotting element sizes  [px]
     # ----------------------------
     chr_bin_height = 60
+    space_top_gene = 12
     gene_height = 30
+    space_bottom_gene = 20
     sum_cna_height = 30 + 30*(len(df_cellclass[df_cellclass_classify_by].unique()) if df_cellclass is not None else 0)
+    space_bottom_sum_cna = 12
     main_cna_height = len(col_data)
     space_top_chr = 70
     chr_length = 600
@@ -167,7 +170,17 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     table_height = 350
 
 
-    vstack_height = table_height+main_cna_height+sum_cna_height+gene_height+chr_bin_height+chr_length+space_top_chr+space_bottom_chr
+    vstack_height = (table_height
+                     +main_cna_height
+                     +sum_cna_height
+                     +gene_height
+                     +chr_bin_height
+                     +chr_length
+                     +space_top_chr
+                     +space_bottom_chr
+                     +space_top_gene
+                     +space_bottom_gene
+                     +space_bottom_sum_cna)
 
     list_genomic_pos_hm_tile = [f"{row["CHR"]} | {int(row["START"])} - {int(row["END"])}" for _, row in
                                 bin_df.iterrows()]
@@ -213,6 +226,9 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                    "",
                    "",
                    "",
+                   "",
+                   "",
+                   "",
                    "<b>Predictive saturation along the genome</b>",
                    "",
                    "")
@@ -226,18 +242,24 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                        "", "",
                        "", "",
                        "", "",
+                       "", "",
+                       "", "",
+                       "", "",
                        "", "<b>Predictive saturation along the genome</b>",
                        "", "",
                        "", "")
 
-    fig_vstack = make_subplots(rows=8,
+    fig_vstack = make_subplots(rows=11,
                                cols=col_pos,
-                               vertical_spacing=0.01,
+                               vertical_spacing=0,
                                subplot_titles=tuple_title,
                                horizontal_spacing=0.01,
                                row_heights=[chr_bin_height/vstack_height,
+                                            space_top_gene/vstack_height,
                                             gene_height/vstack_height,
+                                            space_bottom_gene/vstack_height,
                                             sum_cna_height/vstack_height,
+                                            space_bottom_sum_cna/vstack_height,
                                             main_cna_height/vstack_height,
                                             space_top_chr/vstack_height,
                                             chr_length/vstack_height,
@@ -245,6 +267,9 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                                             table_height/vstack_height],
                                column_widths=col_width,
                                specs=[[{"type": "xy"}]*col_pos,
+                                      [{"type": "xy"}]*col_pos,
+                                      [{"type": "xy"}]*col_pos,
+                                      [{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
                                       [{"type": "xy"}]*col_pos,
@@ -288,7 +313,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                           "hovertemplate":"%{customdata} <extra></extra>"}])
 
     fig_vstack.add_trace(middle_fig.data[0],
-                         row=2,
+                         row=3,
                          col=col_pos)
 
     # main-sum CNA plot
@@ -311,7 +336,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                           "hovertemplate":"<b>Cell | %{y} </b><br>   val-CNA | %{z} <br>   %{x} <br>   %{customdata} <extra></extra>"}])
 
     fig_vstack.add_trace(cna_fig.data[0],
-                         row=3,
+                         row=5,
                          col=col_pos)
 
     # main CNA plot
@@ -325,7 +350,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                           "hovertemplate":"<b>Cell | %{y} </b><br>   val-CNA | %{z} <br>   %{x} <br>   %{customdata} <extra></extra>"}])
 
     fig_vstack.add_trace(cna_fig.data[0],
-                         row=4,
+                         row=7,
                          col=col_pos)
 
     # expansion plot for showing cell characteristics
@@ -350,7 +375,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
         cell_fig.update_coloraxes(showscale=False)
         fig_vstack.add_trace(cell_fig.data[0],
-                             row=4,
+                             row=7,
                              col=1)
         fig_vstack.data[-1].update(coloraxis="coloraxis2")
 
@@ -389,7 +414,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     # the plural of add_trace since a list of items! --> often a silly mistake
     fig_vstack.add_traces(chr_multi_bar,
-                          rows=6,
+                          rows=9,
                           cols=col_pos)
 
     # table
@@ -411,7 +436,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     )
 
     fig_vstack.add_trace(table_summary,
-                          row=8,
+                          row=11,
                           col=col_pos)
 
     ##########################
@@ -429,7 +454,9 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                              coloraxis=dict(colorscale=[[0, "#009bde"],
                                                         [0.5, "#dedede"],
                                                         [1.0, "#f23081"]],
-                                            colorbar=dict(len=main_cna_height,
+                                            colorbar=dict(len=(main_cna_height
+                                                               +gene_height+chr_bin_height
+                                                               +sum_cna_height),
                                                           lenmode="pixels",
                                                           title="<b>CNA-value</b>",
                                                           yanchor="top",
@@ -451,19 +478,19 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
     # locked axis
     fig_vstack.update_xaxes(row=1, col=col_pos, matches='x')
-    fig_vstack.update_xaxes(row=2, col=col_pos, matches='x')
     fig_vstack.update_xaxes(row=3, col=col_pos, matches='x')
-    fig_vstack.update_xaxes(row=4, col=col_pos, matches='x')
+    fig_vstack.update_xaxes(row=5, col=col_pos, matches='x')
+    fig_vstack.update_xaxes(row=7, col=col_pos, matches='x')
 
     # overlay barplot
-    fig_vstack.update_xaxes(row=6, col=col_pos, showgrid=False, showticklabels=True)
-    fig_vstack.update_yaxes(row=6, col=col_pos, showgrid=False, showticklabels=False)
+    fig_vstack.update_xaxes(row=9, col=col_pos, showgrid=False, showticklabels=True)
+    fig_vstack.update_yaxes(row=9, col=col_pos, showgrid=False, showticklabels=False)
 
     # lock cell-tag axis horizontally
     if df_cellclass is not None:
-        fig_vstack.update_yaxes(row=4, col=2, matches='y', showticklabels=False)
-        fig_vstack.update_yaxes(row=4, col=1, matches='y')
-        fig_vstack.update_xaxes(row=4, col=1, showticklabels=True)
+        fig_vstack.update_yaxes(row=7, col=2, matches='y', showticklabels=False)
+        fig_vstack.update_yaxes(row=7, col=1, matches='y')
+        fig_vstack.update_xaxes(row=7, col=1, showticklabels=True)
 
     print("> generation of html document [✓]")
 
