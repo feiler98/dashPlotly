@@ -362,7 +362,14 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
         for col_tag, dict_encode_col in dict_encode.items():
             df_cellclass_sub[col_tag] = df_cellclass[col_tag].map(lambda x: dict_encode_col[x])
 
+        # bring df_cellclass_classify_by to front
+        df_cellclass_cols = list(df_cellclass.columns)
+        df_cellclass_cols.insert(0, df_cellclass_cols.pop(df_cellclass_cols.index(df_cellclass_classify_by)))
+        df_cellclass = df_cellclass[df_cellclass_cols]
         cellclass_info_arr = df_cellclass.to_numpy()
+
+        # main support describe
+        # ---------------------
         col_list_df_cellclass = [f"<b>{idx}</b>" for idx in list(df_cellclass.columns)]
         cell_fig = px.imshow(df_cellclass_sub.to_numpy(),
                             y=list(df_cellclass.index),
@@ -373,9 +380,25 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
         cell_fig.update(data=[{"customdata": cellclass_info_arr,
                               "hovertemplate": "<b>Cell | %{y} </b><br>   %{customdata} <extra></extra>"}])
 
-        cell_fig.update_coloraxes(showscale=False)
         fig_vstack.add_trace(cell_fig.data[0],
                              row=7,
+                             col=1)
+        fig_vstack.data[-1].update(coloraxis="coloraxis2")
+
+        # summary support describe
+        # ------------------------
+        list_val_summary = [[1.0]]
+        list_val_summary.extend([[float(dict_encode[df_cellclass_classify_by][tag])] for tag in unique_list])
+        sum_fig = px.imshow(np.array(list_val_summary),
+                             y=sum_y,
+                             x=["categories"],
+                             text_auto=False,
+                             aspect="auto")
+
+        sum_fig.update(data=[{"hovertemplate": "<b>%{y}</b><extra></extra>"}])
+
+        fig_vstack.add_trace(sum_fig.data[0],
+                             row=5,
                              col=1)
         fig_vstack.data[-1].update(coloraxis="coloraxis2")
 
@@ -479,7 +502,18 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                              paper_bgcolor='rgb(34, 37, 87)',
                              barmode="overlay")
 
-    # locked axis
+    # lock cell-tag axis horizontally and vertically --> it adds a grid axis ID --> so any name is possible
+    if df_cellclass is not None:
+        # main CNA
+        # --------
+        fig_vstack.update_yaxes(row=7, col=2, matches='y', showticklabels=False)
+        fig_vstack.update_xaxes(row=7, col=1,  matches='y', showticklabels=True)
+
+        # summary CNA
+        # -----------
+        fig_vstack.update_yaxes(row=5, col=2, matches='y2', showticklabels=False)
+        fig_vstack.update_yaxes(row=5, col=1, matches='y2', showticklabels=True)
+
     fig_vstack.update_xaxes(row=1, col=col_pos, matches='x')
     fig_vstack.update_xaxes(row=3, col=col_pos, matches='x')
     fig_vstack.update_xaxes(row=5, col=col_pos, matches='x')
@@ -489,11 +523,6 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     fig_vstack.update_xaxes(row=9, col=col_pos, showgrid=False, showticklabels=True)
     fig_vstack.update_yaxes(row=9, col=col_pos, showgrid=False, showticklabels=False)
 
-    # lock cell-tag axis horizontally
-    if df_cellclass is not None:
-        fig_vstack.update_yaxes(row=7, col=2, matches='y', showticklabels=False)
-        fig_vstack.update_yaxes(row=7, col=1, matches='y')
-        fig_vstack.update_xaxes(row=7, col=1, showticklabels=True)
 
     print("> generation of html document [✓]")
 
@@ -506,5 +535,6 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 if __name__ == "__main__":
     path_ck_cnv = Path(__file__).parent / "data" / "test_cnv_plot"
     build_cnv_heatmap(df_cnv=pd.read_csv(path_ck_cnv / "copykat_curated.csv"),
-                      data_title="copykat CNA-matrix only",
+                      df_cellclass=pd.read_csv(path_ck_cnv / "cells_copykat_scONE_GBM.csv", index_col="cells"),
+                      data_title="copykat CNA-matrix and cell class",
                       sort=True)
