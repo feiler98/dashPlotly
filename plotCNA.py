@@ -514,6 +514,10 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
         fig_vstack.update_yaxes(row=5, col=2, matches='y2', showticklabels=False)
         fig_vstack.update_yaxes(row=5, col=1, matches='y2', showticklabels=True)
 
+        # avoid error in rendering
+        fig_vstack.update_yaxes(row=1, col=1, matches='y3', showticklabels=True)
+        fig_vstack.update_yaxes(row=3, col=1, matches='y4', showticklabels=True)
+
     fig_vstack.update_xaxes(row=1, col=col_pos, matches='x')
     fig_vstack.update_xaxes(row=3, col=col_pos, matches='x')
     fig_vstack.update_xaxes(row=5, col=col_pos, matches='x')
