@@ -158,13 +158,13 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     # plotting element sizes  [px]
     # ----------------------------
     chr_bin_height = 60
-    space_top_gene = 12
+    space_top_gene = 10
     gene_height = 30
     space_bottom_gene = 20
     sum_cna_height = 30 + 30*(len(df_cellclass[df_cellclass_classify_by].unique()) if df_cellclass is not None else 0)
-    space_bottom_sum_cna = 12
+    space_bottom_sum_cna = 10
     main_cna_height = len(col_data)
-    space_top_chr = 70
+    space_top_chr = 90
     chr_length = 600
     space_bottom_chr = 170
     table_height = 350
@@ -319,13 +319,13 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     # main-sum CNA plot
     # -----------------
     mean_array_list = [df_norm.T.mean(axis=0).to_numpy()]
-    sum_y = ["<b>summarized CNA</b>"]
+    sum_y = ["<b>summarized CNA | all cells</b>"]
     if df_cellclass is not None:
         unique_list = list(df_cellclass[df_cellclass_classify_by].unique())
         for unique_class in unique_list:
             filter_idx = list(df_cellclass.where(df_cellclass[df_cellclass_classify_by] == unique_class).dropna().index)
             mean_array_list.append(df_norm[filter_idx].T.mean(axis=0).to_numpy())
-        sum_y.extend([f"<b>{unique_class}</b>" for unique_class in unique_list])
+        sum_y.extend([f"<b>summarized CNA | {unique_class}</b>" for unique_class in unique_list])
 
     cna_fig = px.imshow(mean_array_list,
                     y=sum_y,
@@ -455,8 +455,11 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                                                         [0.5, "#dedede"],
                                                         [1.0, "#f23081"]],
                                             colorbar=dict(len=(main_cna_height
-                                                               +gene_height+chr_bin_height
-                                                               +sum_cna_height),
+                                                               +sum_cna_height
+                                                               +space_top_gene
+                                                               +space_bottom_gene
+                                                               +space_bottom_sum_cna
+                                                               -20),
                                                           lenmode="pixels",
                                                           title="<b>CNA-value</b>",
                                                           yanchor="top",
@@ -503,6 +506,5 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 if __name__ == "__main__":
     path_ck_cnv = Path(__file__).parent / "data" / "test_cnv_plot"
     build_cnv_heatmap(df_cnv=pd.read_csv(path_ck_cnv / "copykat_curated.csv"),
-                      df_cellclass=pd.read_csv(path_ck_cnv / "cells_copykat_scONE_GBM.csv", index_col="cells"),
-                      data_title="copykat with cellclass description",
+                      data_title="copykat CNA-matrix only",
                       sort=True)

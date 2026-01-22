@@ -167,11 +167,13 @@ def calc_pred_saturation(df_cna_idx, assembly_genome: str = "hg_38"):
 
 
 def sort_df_row_by_similarity(df):
-    max_diff_from_zero_array_idx = df.abs().sum(axis=1).sort_values(ascending=False).index[0]
+    max_diff_from_zero_array_idx = df.pow(2).sum(axis=1).sort_values(ascending=False).index[0]
     list_row_max_diff = df.loc[max_diff_from_zero_array_idx, :]
+    # create second dataframe with most "unnormal" cell (highest squared residual)
     df_subtract = pd.DataFrame([list_row_max_diff]*len(df), index=df.index, columns=df.columns)
+    # check relative distance between most "unnormal" cell to other cells  --> residuals over full array
     df_diff = df.sub(df_subtract)
-    df["SORT_DF"] = df_diff.abs().sum(axis=1)
+    df["SORT_DF"] = df_diff.pow(2).sum(axis=1)
     df.sort_values("SORT_DF", inplace=True, ascending=True)
     return df.drop("SORT_DF", axis=1)
 
