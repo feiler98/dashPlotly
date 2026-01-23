@@ -46,6 +46,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                       assembly_genome: str = "hg_38"):
     """
     Creates an express plotly imshow heatmap of infercnv data.
+    Advanced visualization with custom data embedding and prediction saturation statistics
 
     Parameters
     ----------
