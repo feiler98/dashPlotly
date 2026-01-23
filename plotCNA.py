@@ -387,6 +387,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
         # summary support describe
         # ------------------------
+        unique_list = list(df_cellclass[df_cellclass_classify_by].unique())
         list_val_summary = [[1.0]]
         list_val_summary.extend([[float(dict_encode[df_cellclass_classify_by][tag])] for tag in unique_list])
         sum_fig = px.imshow(np.array(list_val_summary),
