@@ -503,20 +503,6 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
                              barmode="overlay")
 
     # lock cell-tag axis horizontally and vertically --> it adds a grid axis ID --> so any name is possible
-    if df_cellclass is not None:
-        # main CNA
-        # --------
-        fig_vstack.update_yaxes(row=7, col=2, matches='y', showticklabels=False)
-        fig_vstack.update_xaxes(row=7, col=1, matches='y', showticklabels=True)
-
-        # summary CNA
-        # -----------
-        fig_vstack.update_yaxes(row=5, col=2, matches='y2', showticklabels=False)
-        fig_vstack.update_yaxes(row=5, col=1, matches='y2', showticklabels=True)
-
-        # avoid error in rendering
-        fig_vstack.update_yaxes(row=1, col=2, matches='y3', showticklabels=True)
-        fig_vstack.update_yaxes(row=3, col=2, matches='y4', showticklabels=True)
 
     fig_vstack.update_xaxes(row=1, col=col_pos, matches='x')
     fig_vstack.update_xaxes(row=3, col=col_pos, matches='x')
@@ -526,6 +512,17 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     # overlay barplot
     fig_vstack.update_xaxes(row=9, col=col_pos, showgrid=False, showticklabels=True)
     fig_vstack.update_yaxes(row=9, col=col_pos, showgrid=False, showticklabels=False)
+
+    if df_cellclass is not None:
+        # main CNA
+        # --------
+        fig_vstack.update_yaxes(row=7, col=2, matches='y7', showticklabels=False)
+        fig_vstack.update_yaxes(row=7, col=1, matches='y7', showticklabels=True)
+
+        # summary CNA
+        # -----------
+        fig_vstack.update_yaxes(row=5, col=2, matches='y5', showticklabels=False)
+        fig_vstack.update_yaxes(row=5, col=1, matches='y5', showticklabels=True)
 
 
     print("> generation of html document [✓]")
