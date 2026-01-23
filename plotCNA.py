@@ -519,6 +519,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
         # --------
         fig_vstack.update_yaxes(row=7, col=2, matches='y7', showticklabels=False)
         fig_vstack.update_yaxes(row=7, col=1, matches='y7', showticklabels=True)
+        fig_vstack.update_xaxes(row=7, col=1, showticklabels=True)
 
         # summary CNA
         # -----------
