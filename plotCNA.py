@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 
 # local imports
-from utility_lib import (calc_absolute_bin_position,
+from utility_lib import (df_cna_idx_get_gene_info,
                          map_arm_by_chr_pos,
                          sort_df_row_by_similarity,
                          calc_pred_saturation,
@@ -185,9 +185,9 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     list_genomic_pos_hm_tile = [f"{row["CHR"]} | {int(row["START"])} - {int(row["END"])}" for _, row in
                                 bin_df.iterrows()]
 
-    slice_pos, _ = calc_absolute_bin_position(bin_df, assembly_genome)
+    df_gene_info, _ = df_cna_idx_get_gene_info(bin_df, assembly_genome)
 
-    list_genes_text = slice_pos["genes_txt"].tolist()  # list with all genes per bin
+    list_genes_text = df_gene_info["genes_txt"].tolist()  # list with all genes per bin
     list_genomic_arm_tag = map_arm_by_chr_pos(bin_df, df_arms)
     list_text = [[arm_tag]*len(col_data) for arm_tag in list_genomic_arm_tag]
     list_text_t = np.array(list_transpose(list_text))
