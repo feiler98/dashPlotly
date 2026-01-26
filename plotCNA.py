@@ -52,7 +52,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     ----------
     df_cnv: pd.DataFrame
         DataFrame CNA-matrix (usually from .csv); output of any InferCNV-like method.
-        [index --> chr-bins; columns --> 'CHR', 'START', 'END', cells]
+        [index --> chr-bins; columns --> 'CHR', 'START', 'END', *cells]
     path_out: str | Path
         Location where .html file saved;
     data_title: str
@@ -98,6 +98,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     # ------------------------------------------------------------------------------------------------------------------
     # additional data in form of cell classes (col 1 of 2)
     if df_cellclass is not None:
+        df_cellclass = df_cellclass.fillna("unknown")
         idx_cellclass = list(df_cellclass.index)
         union_cells = [c_tag for c_tag in idx_cellclass if c_tag in col_data]
         if not len(union_cells) > 0:
@@ -116,7 +117,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
         # sort if passed
         if sort:
             unique_list_col = list(df_cellclass[df_cellclass_classify_by].unique())
-            list_sub_slices = [sort_df_row_by_similarity(df_cnv[df_cellclass[df_cellclass[df_cellclass_classify_by] == unique_tag].dropna().index].T).T for unique_tag in unique_list_col]
+            list_sub_slices = [sort_df_row_by_similarity(df_cnv[df_cellclass[df_cellclass[df_cellclass_classify_by] == unique_tag].dropna(subset=df_cellclass_classify_by).index].T).T for unique_tag in unique_list_col]
             slice_data = pd.concat(list_sub_slices, axis=1)
             df_cellclass = df_cellclass.loc[list(slice_data.columns), :]
             flag_sort = True
@@ -164,7 +165,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
     space_bottom_gene = 20
     sum_cna_height = 30 + 30*(len(df_cellclass[df_cellclass_classify_by].unique()) if df_cellclass is not None else 0)
     space_bottom_sum_cna = 10
-    main_cna_height = len(col_data)
+    main_cna_height = len(col_data) if len(col_data) <= 1000 else 1000
     space_top_chr = 90
     chr_length = 600
     space_bottom_chr = 170
@@ -537,8 +538,8 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
 
 # docker testing
 if __name__ == "__main__":
-    path_ck_cnv = Path(__file__).parent / "data" / "test_cnv_plot"
-    build_cnv_heatmap(df_cnv=pd.read_csv(path_ck_cnv / "copykat_curated.csv"),
-                      df_cellclass=pd.read_csv(path_ck_cnv / "cells_copykat_scONE_GBM.csv", index_col="cells"),
-                      data_title="copykat CNA-matrix and cell class",
+    path_scevan_cnv = Path("/home/feilerwe/dashPlotly/data/plotlyCNA_capabilities/scevan_pred/out__GSE185269_10x_GBM__kerl_fixed_probes__hg_38__RCM__c5ngc5pg10bv0.5__scevan_")
+    build_cnv_heatmap(df_cnv=pd.read_csv(path_scevan_cnv / "GSE185269_10x_GBM__kerl_fixed_probes__hg_38__RCM__c5ngc5pg10bv0.5__scevan__GBC__cur.csv").iloc[:, :1000],
+                      df_cellclass=pd.read_csv(path_scevan_cnv / "GSE185269_10x_GBM__kerl_fixed_probes__hg_38__RCM__c5ngc5pg10bv0.5__scevan___results.csv", index_col="cells").iloc[:1000, :],
+                      data_title="SCEVAN GBM filtered by fixed probes",
                       sort=True)
