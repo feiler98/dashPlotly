@@ -329,7 +329,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
             mean_array_list.append(df_norm[filter_idx].T.mean(axis=0).to_numpy())
         sum_y.extend([f"<b>summarized CNA | {unique_class}</b>" for unique_class in unique_list])
 
-    cna_fig = px.imshow(mean_array_list,
+    cna_fig = px.imshow(np.round(np.array(mean_array_list), decimals=2),
                     y=sum_y,
                     x=list_genomic_pos_hm_tile,
                     text_auto=False,
@@ -373,7 +373,7 @@ def build_cnv_heatmap(df_cnv: pd.DataFrame,
         # main support describe
         # ---------------------
         col_list_df_cellclass = [f"<b>{idx}</b>" for idx in list(df_cellclass.columns)]
-        cell_fig = px.imshow(df_cellclass_sub.to_numpy(),
+        cell_fig = px.imshow(df_cellclass_sub[df_cellclass_cols].to_numpy(),
                             y=list(df_cellclass.index),
                             x=col_list_df_cellclass,
                             text_auto=False,
